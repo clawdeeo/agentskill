@@ -5,43 +5,43 @@ description: Analyze one or more code repositories to extract the user's coding 
 
 # AgentSkill — Coding Style Synthesizer
 
-Analyze repositories and synthesize a personal AGENTS.md that captures coding style, conventions, and habits.
+Analyze repositories and synthesize a personal AGENTS.md that captures coding style, conventions, and habits across **all detected languages**.
 
 ## Workflow
 
-1. **Collect inputs** — Ask user for one or more repository paths (local or remote). Also ask what languages they care about most, if not obvious.
+1. **Collect inputs** — Ask user for one or more repository paths (local or remote). No need to ask about languages — we detect all.
 
-2. **Run extraction** — Execute `scripts/extract.py <repo-paths...>` which outputs a structured JSON report containing:
-   - Naming conventions by language (vars, types, functions, files, branches)
-   - Comment patterns (density, style, what gets explained)
-   - Function/method metrics (average length, complexity hints)
-   - Error handling patterns (Result types, exceptions, unwrap/panic usage)
-   - Git conventions (commit prefixes, branch prefixes, PR style)
-   - Tooling configs (linter, formatter, CI files)
-   - Architecture patterns (module organization, visibility, traits/interfaces)
+2. **Run extraction** — Execute `scripts/extract.py <repo-paths...>` which outputs a structured JSON report containing patterns across all languages found.
 
-3. **Synthesize AGENTS.md** — Feed the JSON report into the LLM with the prompt from `references/synthesis-prompt.md`. The LLM reads the data and drafts a clean AGENTS.md in the user's voice.
+3. **Check GOTCHAS.md** — Read `references/GOTCHAS.md` for common extraction errors and synthesis pitfalls to avoid.
 
-4. **Iterate** — Present the draft. Let the user request adjustments (more terse, add/remove sections, focus on specific languages). Re-run synthesis with updated instructions.
+4. **Review examples** — If available, browse `examples/` folder for successful AGENTS.md templates and patterns.
 
-5. **Save** — Write the final AGENTS.md to the user's workspace or a path they specify.
+5. **Synthesize AGENTS.md** — Feed the JSON report into the LLM with `references/synthesis-prompt.md`. Draft a clean AGENTS.md in the user's voice.
+
+6. **Iterate** — Present the draft. Let the user request adjustments. Re-run synthesis with updated instructions.
+
+7. **Save** — Write the final AGENTS.md to the user's workspace.
 
 ## Key Principles
 
-- **Extract, don't guess.** Use AST-level metrics and git logs, not surface-level file reading.
-- **Triangulate.** If the user gives multiple repos, find patterns that hold across them. Flag repo-specific deviations.
-- **Separate style from tooling.** Linter-enforced rules (e.g., tab width) go in a "Tooling" section. Personal philosophy goes in "Style".
-- **Actionable, not abstract.** "Prefer early extraction" is better than "Keep functions short."
-- **Minimal.** Only include rules that are distinctive or non-obvious. Don't document "use camelCase" unless it's unusual or paired with specific exceptions.
+- **Extract, don't guess.** Use AST-level metrics and git logs.
+- **Triangulate.** Find patterns that hold across repos. Flag repo-specific deviations.
+- **Multi-language.** Detect and document patterns for **every language found**, not just one.
+- **Separate style from tooling.** Linter rules go in "Tooling". Personal philosophy goes in "Style".
+- **Actionable, not abstract.** "Prefer early extraction" beats "Keep functions short."
+- **Minimal.** Only include distinctive or non-obvious rules.
 
 ## When to Read References
 
-- **Synthesis prompt template:** Read `references/synthesis-prompt.md` before generating AGENTS.md draft.
-- **Output format guide:** Read `references/output-template.md` if the user wants a specific AGENTS.md structure.
+- **GOTCHAS.md:** Always read before synthesis — contains extraction errors to avoid.
+- **synthesis-prompt.md:** Read before generating AGENTS.md draft.
+- **output-template.md:** Read if user wants specific AGENTS.md structure.
+- **examples/:** Browse for successful templates to emulate.
 
 ## Scripts
 
-- `scripts/extract.py` — The main extraction engine. Run with `python3 scripts/extract.py <repo1> [repo2] ...`.
+- `scripts/extract.py` — Main extraction engine. Run: `python3 scripts/extract.py <repo1> [repo2] ...`
   - Requires Python 3.8+
-  - Uses `git`, `cloc`, and basic AST heuristics (no external parser deps)
-  - Outputs JSON to stdout; capture to file if needed
+  - Multi-language support (Rust, Python, Go, JS/TS, etc.)
+  - Outputs JSON to stdout

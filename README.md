@@ -46,41 +46,38 @@ cat report.json | jq '.code_style.rust.naming_descriptiveness'
 
 | Category | Patterns |
 |----------|----------|
-| **Naming** | Case style, average name length by symbol type |
+| **Naming** | Case style, average name length by symbol type, descriptiveness |
 | **Spacing** | Blank line habits between blocks |
 | **Comments** | Style (// vs ///), density, what gets documented |
 | **Error handling** | unwrap vs ? vs Result, panic tolerance |
 | **Git** | Commit prefixes, branch naming, PR style |
 | **Tooling** | Linters, formatters, CI configs |
 
-## Supported Languages
+## Multi-Language Support
 
-- **Rust** — Full analysis
-- **Python** — Partial (naming, comments)
-- **Go** — File detection only
-- **JavaScript/TypeScript** — File detection only
+Detects and documents patterns across **all languages** found in your repos:
 
-PRs welcome for deeper language support.
+- **Rust** — Full analysis (naming, errors, comments, spacing)
+- **Python** — Naming, comments, function metrics
+- **Go** — File detection + git patterns
+- **JavaScript/TypeScript** — File detection + git patterns
 
-## How It Works
+Add more: extend `extract.py` with language-specific parsers.
+
+## File Structure
 
 ```
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│   Repos     │────>│  extract.py  │────>│   Report    │
-│   (1-N)     │     │  (AST + git) │     │   (JSON)    │
-└─────────────┘     └──────────────┘     └──────┬──────┘
-                                                │
-                                                ▼
-                                       ┌──────────────┐
-                                       │   LLM +      │
-                                       │   synthesis  │
-                                       │   prompt     │
-                                       └──────┬──────┘
-                                                │
-                                                ▼
-                                          ┌──────────┐
-                                          │ AGENTS.md│
-                                          └──────────┘
+agentskill/
+├── SKILL.md              # Skill instructions for OpenClaw
+├── README.md             # This file
+├── scripts/
+│   └── extract.py        # Multi-language extraction engine
+├── references/
+│   ├── synthesis-prompt.md   # LLM prompt template
+│   ├── output-template.md    # AGENTS.md structure guide
+│   └── GOTCHAS.md            # Common extraction errors to avoid
+└── examples/
+    └── gitclaw-airscript.md  # Example synthesized AGENTS.md
 ```
 
 ## Output Example

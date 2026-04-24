@@ -1,66 +1,85 @@
 # Synthesis Prompt for AGENTS.md Generation
 
-You are a coding style analyst. You have been given a structured report extracted from one or more repositories. Your job is to synthesize a clean, actionable AGENTS.md file that captures the user's personal coding philosophy and conventions.
+You are a coding style analyst. You have been given a structured report extracted from one or more repositories. Your job is to synthesize a clean, actionable AGENTS.md file that captures the user's personal coding philosophy and conventions across **all detected languages**.
 
 ## Input
 
-You will receive a JSON report with the following sections:
-- `naming`: conventions by language and symbol type
-- `comments`: density, style, what gets documented
-- `functions`: length, complexity, extraction patterns
-- `errors`: how errors are handled by language
-- `git`: commit style, branch prefixes, PR workflow
-- `tooling`: linters, formatters, CI patterns
-- `architecture`: module organization, visibility, patterns
+You will receive a JSON report with:
+- `repos`: List of analyzed repositories
+- `analyses`: Per-repo analysis containing:
+  - `languages`: Analysis per language (naming, errors, comments, file counts)
+  - `code_style`: Language-agnostic style patterns (naming descriptiveness, blank lines, comment patterns)
+  - `git`: Commit and branch patterns
+  - `tooling`: Detected tooling configs
 
 ## Output Format
 
 Generate AGENTS.md in this structure:
 
 ```markdown
-# AGENTS.md — Coding Style
+# AGENTS.md — Coding Style: [Username]
 
 ## Overview
-One-paragraph summary of the coder's philosophy (e.g., "Minimalist, pragmatic Rustacean. Prefers explicit over clever, early extraction, and zero tolerance for dead code.")
+One-paragraph summary capturing philosophy across all languages.
 
-## {Language}
-Repeat per detected language:
-
+## Cross-Language Patterns
 ### Naming
-- vars: camelCase
-- types: PascalCase
-- consts: SCREAMING_SNAKE
-- files: kebab-case.rs
-- modules: snake_case
-
-### Error Handling
-Pattern observed (e.g., propagate with `?`, never unwrap in library code)
+Patterns that hold across languages (if any)
 
 ### Comments
-When and how. Density estimate.
+- Density, style, philosophy
+
+### Error Handling
+General approach (if consistent)
+
+## [Language 1]
+### Naming
+- vars: case style (avg length if notable)
+- types: case style
+- functions: case style + descriptiveness note
+
+### Error Handling
+Specific patterns
+
+### Comments
+Density, what gets documented
 
 ### Functions
-Length guidance. When to extract.
+Length guidance
 
-### Architecture
-Key patterns (composition vs inheritance, trait usage, etc.)
+### Tooling
+Language-specific tools
+
+## [Language 2]
+... repeat ...
 
 ## Git
-- Branches: prefix conventions
-- Commits: message structure
-- PRs: title style, description expectations
+- Commits: format, prefixes, length, style
+- Branches: naming, workflow type
+- PRs: inferred style
 
 ## Tooling
-Linters, formatters, CI checks the user relies on.
+Global tooling across projects
 
 ## Red Lines
-Things the user explicitly avoids or disallows (e.g., "Never commit to main", "No unwrap in library code", "No dead code — remove, don't allow").
+Things explicitly avoided or disallowed
+
+---
+**Source:** repo names + stats
+**Confidence:** High/Medium/Low annotations on non-obvious claims
 ```
 
 ## Rules
 
-1. **Only include what the data supports.** If the data is ambiguous, say so or omit.
-2. **Distinguish personal preference from project convention.** If all repos share a pattern, it's likely personal. If only one repo does it, flag as "Project-specific: X repo uses Y."
-3. **Use their voice.** Match the tone of their commit messages and comments.
-4. **Be specific.** "Keep functions short" is weak. "Extract when a function exceeds ~40 lines" is strong.
-5. **Minimal.** This document should be scannable in under a minute. Ruthlessly cut fluff.
+1. **Multi-language first.** Document patterns for every language found, even if brief.
+2. **Cross-language section.** If patterns hold across languages (e.g., always descriptive names), document once at the top.
+3. **Only what data supports.** Flag uncertainty with confidence annotations.
+4. **Distinguish preference from convention.** Use "Project-specific" when pattern only appears in one repo.
+5. **Avoid universal truths.** "Uses snake_case in Rust" is noise unless it's a deviation.
+6. **Contextualize.** High `unwrap` in a CLI is different than in a library.
+7. **Check GOTCHAS.md first.** Avoid the documented pitfalls.
+
+## Confidence Annotations
+
+Use inline: "descriptive function names (High)" or section footers:
+"**Confidence:** High on naming; Medium on branch patterns (limited sample)"
