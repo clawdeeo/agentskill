@@ -435,8 +435,20 @@ def main():
     # Build final report
     final_report = {
         "repos": valid_repos,
-        "analyses": reports
+        "analyses": [asdict(r) if hasattr(r, '__dataclass_fields__') else r for r in reports]
     }
+    
+    # Recursively convert any nested dataclasses
+    def convert_dataclasses(obj):
+        if isinstance(obj, dict):
+            return {k: convert_dataclasses(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [convert_dataclasses(item) for item in obj]
+        elif hasattr(obj, '__dataclass_fields__'):
+            return convert_dataclasses(asdict(obj))
+        return obj
+    
+    final_report = convert_dataclasses(final_report)
     
     output = json.dumps(final_report, indent=2)
     
