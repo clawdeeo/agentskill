@@ -32,10 +32,25 @@ class NamingPatterns:
 
 
 @dataclass
+class CodeStyle:
+    naming_descriptiveness: Dict[str, float] = None  # avg name length by type
+    blank_lines: Dict[str, float] = None  # avg blank lines between constructs
+    comment_patterns: Dict[str, int] = None  # // vs /* */ vs /// vs //!
+    import_organization: Dict[str, str] = None  # how imports are grouped/ordered
+    
+    def __post_init__(self):
+        if self.naming_descriptiveness is None: self.naming_descriptiveness = {}
+        if self.blank_lines is None: self.blank_lines = {}
+        if self.comment_patterns is None: self.comment_patterns = {}
+        if self.import_organization is None: self.import_organization = {}
+
+
+@dataclass
 class Report:
     repos: List[str]
     languages: Dict[str, Dict]
     naming: Dict[str, NamingPatterns]
+    code_style: Dict[str, CodeStyle]
     comments: Dict[str, Dict]
     functions: Dict[str, Dict]
     errors: Dict[str, Dict]
@@ -158,6 +173,95 @@ def scan_source_files(repo_path: str) -> Dict[str, List[Path]]:
     return {k: v for k, v in files_by_lang.items() if v}
 
 
+def analyze_code_style(files: List[Path], language: str) -> CodeStyle:
+    """Analyze code style patterns: naming descriptiveness, spacing, comments."""
+    style = CodeStyle()
+    
+    name_lengths = {"vars": [], "types": [], "functions": [], "consts": []}
+    blank_line_counts = []
+    comment_styles = {"//": 0, "/*": 0, "///": 0, "//!": 0, "#": 0, "//": 0}
+    
+    for filepath in files[:30]:  # Sample
+        try:
+            content = filepath.read_text(errors='ignore')
+            lines = content.split('\n')
+            
+            prev_was_code = False
+            blank_streak = 0
+            
+            for i, line in enumerate(lines):
+                stripped = line.strip()
+                
+                # Track blank lines between code blocks
+                if not stripped:
+                    blank_streak += 1
+                elif prev_was_code and blank_streak > 0:
+                    blank_line_counts.append(blank_streak)
+                    blank_streak = 0
+                    prev_was_code = True
+                else:
+                    prev_was_code = True
+                    blank_streak = 0
+                
+                # Comment style detection
+                if stripped.startswith('///') or stripped.startswith('/**'):
+                    comment_styles['///'] += 1
+                elif stripped.startswith('//!'):
+                    comment_styles['//!'] += 1
+                elif stripped.startswith('//') or stripped.startswith('#'):
+                    comment_styles['//'] += 1
+                elif stripped.startswith('/*'):
+                    comment_styles['/*'] += 1
+                
+                # Name length tracking
+                if language == "rust":
+                    if 'let ' in line:
+                        match = re.search(r'let\s+(?:mut\s+)?(\w+)', line)
+                        if match:
+                            name_lengths["vars"].append(len(match.group(1)))
+                    if 'fn ' in line:
+                        match = re.search(r'fn\s+(\w+)', line)
+                        if match:
+                            name_lengths["functions"].append(len(match.group(1)))
+                    if re.search(r'(?:struct|enum|trait|type)\s+\w+', line):
+                        match = re.search(r'(?:struct|enum|trait|type)\s+(\w+)', line)
+                        if match:
+                            name_lengths["types"].append(len(match.group(1)))
+                    if 'const ' in line:
+                        match = re.search(r'const\s+(\w+)', line)
+                        if match:
+                            name_lengths["consts"].append(len(match.group(1)))
+                
+                elif language == "python":
+                    if re.match(r'^\s*\w+\s*=\s*', line) and not line.strip().startswith('#'):
+                        match = re.match(r'^\s*(\w+)\s*=', line)
+                        if match and match.group(1) not in ['self', 'cls', 'if', 'for', 'while']:
+                            name_lengths["vars"].append(len(match.group(1)))
+                    if re.match(r'^def\s+\w+', line):
+                        match = re.search(r'def\s+(\w+)', line)
+                        if match:
+                            name_lengths["functions"].append(len(match.group(1)))
+                    if re.match(r'^class\s+\w+', line):
+                        match = re.search(r'class\s+(\w+)', line)
+                        if match:
+                            name_lengths["types"].append(len(match.group(1)))
+        except Exception:
+            continue
+    
+    # Calculate averages
+    for key, lengths in name_lengths.items():
+        if lengths:
+            style.naming_descriptiveness[key] = sum(lengths) / len(lengths)
+    
+    if blank_line_counts:
+        style.blank_lines["avg_between_blocks"] = sum(blank_line_counts) / len(blank_line_counts)
+        style.blank_lines["max_consecutive"] = max(blank_line_counts)
+    
+    style.comment_patterns = comment_styles
+    
+    return style
+
+
 def analyze_rust_files(files: List[Path]) -> Dict:
     """Analyze Rust-specific patterns."""
     naming = {"vars": {}, "types": {}, "consts": {}, "functions": {}}
@@ -274,6 +378,13 @@ def analyze_repo(repo_path: str) -> Dict:
     
     # Analyze source files by language
     files_by_lang = scan_source_files(abs_path)
+    
+    # Analyze code style for each language
+    code_styles = {}
+    for lang, files in files_by_lang.items():
+        code_styles[lang] = analyze_code_style(files, lang)
+    
+    report["code_style"] = code_styles
     
     if "rust" in files_by_lang:
         report["languages"]["rust"] = analyze_rust_files(files_by_lang["rust"])
