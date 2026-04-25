@@ -54,6 +54,21 @@ PYTHON_COMMENT_STYLE = '#'
 RUST_ERROR_PATTERNS = ["unwrap()", "expect(", "?", "panic!", "Result<"]
 RUST_ERROR_KEYS = ["unwrap", "expect", "?", "panic", "Result"]
 
+CASE_SCREAMING_SNAKE = "SCREAMING_SNAKE_CASE"
+CASE_SNAKE = "snake_case"
+CASE_KEBAB = "kebab-case"
+CASE_CAMEL = "camelCase"
+CASE_PASCAL = "PascalCase"
+CASE_MIXED = "mixed"
+
+LANG_RUST = "rust"
+LANG_PYTHON = "python"
+
+NAME_VAR = "vars"
+NAME_FUNCTION = "functions"
+NAME_TYPE = "types"
+NAME_CONST = "consts"
+
 
 @dataclass
 class NamingPatterns:
@@ -110,16 +125,16 @@ class Report:
 
 def detect_case_style(s: str) -> str:
     if s.isupper() and '_' in s:
-        return "SCREAMING_SNAKE_CASE"
+        return CASE_SCREAMING_SNAKE
     if s.islower() and '_' in s:
-        return "snake_case"
+        return CASE_SNAKE
     if s.islower() and '-' in s:
-        return "kebab-case"
+        return CASE_KEBAB
     if s[0].islower() and '_' not in s and '-' not in s:
-        return "camelCase"
+        return CASE_CAMEL
     if s[0].isupper() and '_' not in s and '-' not in s:
-        return "PascalCase"
-    return "mixed"
+        return CASE_PASCAL
+    return CASE_MIXED
 
 
 def run_git_log(repo_path: str) -> str:
@@ -246,22 +261,22 @@ def extract_rust_name_lengths(line: str) -> Dict[str, int]:
     if 'let ' in line:
         match = re.search(r'let\s+(?:mut\s+)?(\w+)', line)
         if match:
-            lengths["vars"] = len(match.group(1))
+            lengths[NAME_VAR] = len(match.group(1))
 
     if 'fn ' in line:
         match = re.search(r'fn\s+(\w+)', line)
         if match:
-            lengths["functions"] = len(match.group(1))
+            lengths[NAME_FUNCTION] = len(match.group(1))
 
     if re.search(r'(?:struct|enum|trait|type)\s+\w+', line):
         match = re.search(r'(?:struct|enum|trait|type)\s+(\w+)', line)
         if match:
-            lengths["types"] = len(match.group(1))
+            lengths[NAME_TYPE] = len(match.group(1))
 
     if 'const ' in line:
         match = re.search(r'const\s+(\w+)', line)
         if match:
-            lengths["consts"] = len(match.group(1))
+            lengths[NAME_CONST] = len(match.group(1))
 
     return lengths
 
@@ -272,17 +287,17 @@ def extract_python_name_lengths(line: str) -> Dict[str, int]:
     if re.match(r'^\s*\w+\s*=\s*', line) and not line.strip().startswith(PYTHON_COMMENT_STYLE):
         match = re.match(r'^\s*(\w+)\s*=', line)
         if match and match.group(1) not in PYTHON_VAR_KEYWORDS:
-            lengths["vars"] = len(match.group(1))
+            lengths[NAME_VAR] = len(match.group(1))
 
     if re.match(r'^def\s+\w+', line):
         match = re.search(r'def\s+(\w+)', line)
         if match:
-            lengths["functions"] = len(match.group(1))
+            lengths[NAME_FUNCTION] = len(match.group(1))
 
     if re.match(r'^class\s+\w+', line):
         match = re.search(r'class\s+(\w+)', line)
         if match:
-            lengths["types"] = len(match.group(1))
+            lengths[NAME_TYPE] = len(match.group(1))
 
     return lengths
 
@@ -303,12 +318,12 @@ def process_file_for_style(filepath: Path, language: str, name_lengths: Dict, bl
         if style:
             comment_styles[style] = comment_styles.get(style, 0) + 1
 
-        if language == "rust":
+        if language == LANG_RUST:
             lengths = extract_rust_name_lengths(line)
             for key, val in lengths.items():
                 name_lengths[key].append(val)
 
-        elif language == "python":
+        elif language == LANG_PYTHON:
             lengths = extract_python_name_lengths(line)
             for key, val in lengths.items():
                 name_lengths[key].append(val)
@@ -317,7 +332,7 @@ def process_file_for_style(filepath: Path, language: str, name_lengths: Dict, bl
 def analyze_code_style(files: List[Path], language: str) -> CodeStyle:
     style = CodeStyle()
 
-    name_lengths = {"vars": [], "types": [], "functions": [], "consts": []}
+    name_lengths = {NAME_VAR: [], NAME_TYPE: [], NAME_FUNCTION: [], NAME_CONST: []}
     blank_line_counts = []
     comment_styles = {k: 0 for k in RUST_COMMENT_STYLES | {PYTHON_COMMENT_STYLE}}
 
@@ -352,22 +367,22 @@ def extract_rust_naming(line: str) -> Dict[str, Tuple[str, str]]:
     if 'let ' in line:
         match = re.search(r'let\s+(?:mut\s+)?(\w+)', line)
         if match:
-            naming["vars"] = (match.group(1), detect_case_style(match.group(1)))
+            naming[NAME_VAR] = (match.group(1), detect_case_style(match.group(1)))
 
     if 'fn ' in line:
         match = re.search(r'fn\s+(\w+)', line)
         if match:
-            naming["functions"] = (match.group(1), detect_case_style(match.group(1)))
+            naming[NAME_FUNCTION] = (match.group(1), detect_case_style(match.group(1)))
 
     if 'struct ' in line or 'enum ' in line or 'trait ' in line:
         match = re.search(r'(?:struct|enum|trait)\s+(\w+)', line)
         if match:
-            naming["types"] = (match.group(1), detect_case_style(match.group(1)))
+            naming[NAME_TYPE] = (match.group(1), detect_case_style(match.group(1)))
 
     if 'const ' in line:
         match = re.search(r'const\s+(\w+)', line)
         if match:
-            naming["consts"] = (match.group(1), detect_case_style(match.group(1)))
+            naming[NAME_CONST] = (match.group(1), detect_case_style(match.group(1)))
 
     return naming
 
@@ -395,7 +410,7 @@ def process_rust_file(filepath: Path, naming: Dict, error_patterns: Dict, counte
 
 
 def analyze_rust_files(files: List[Path]) -> Dict:
-    naming = {"vars": {}, "types": {}, "consts": {}, "functions": {}}
+    naming = {NAME_VAR: {}, NAME_TYPE: {}, NAME_CONST: {}, NAME_FUNCTION: {}}
     error_patterns = {k: 0 for k in RUST_ERROR_KEYS}
     counters = {"comment": 0, "code": 0}
 
@@ -440,8 +455,8 @@ def build_repo_report(abs_path: str, files_by_lang: Dict) -> Dict:
         code_styles[lang] = analyze_code_style(files, lang)
 
     languages = {}
-    if "rust" in files_by_lang:
-        languages["rust"] = analyze_rust_files(files_by_lang["rust"])
+    if LANG_RUST in files_by_lang:
+        languages[LANG_RUST] = analyze_rust_files(files_by_lang[LANG_RUST])
 
     for lang, files in files_by_lang.items():
         if lang not in languages:
