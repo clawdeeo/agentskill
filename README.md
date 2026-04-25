@@ -4,9 +4,9 @@ Generate AGENTS.md from your actual coding style.
 
 ## What It Does
 
-1. **Scans repos** — git history, source files, configs.
-2. **Detects style** — naming, errors, comments, spacing.
-3. **Synthesizes** — clean AGENTS.md via LLM.
+1. **Scans repos** -- git history, source files, configs.
+2. **Detects style** -- naming, errors, comments, spacing.
+3. **Synthesizes** -- clean AGENTS.md via LLM.
 
 ## Install
 
@@ -44,12 +44,7 @@ python3 scripts/extract.py ~/projects/myapp -o report.json
 
 ## Languages
 
-- **Rust** — full analysis
-- **Python** — naming, comments
-- **Go** — file detection + git
-- **JS/TS** — file detection + git
-
-PRs welcome for deeper support.
+Every language is supported.
 
 ## Structure
 
@@ -59,11 +54,11 @@ agentskill/
 ├── README.md
 ├── scripts/extract.py
 ├── references/
-│   ├── synthesis-prompt.md
-│   ├── output-template.md
-│   └── GOTCHAS.md
+│   ├── GOTCHAS.md
+│   ├── OUTPUT-TEMPLATE.md
+│   └── SYNTHESIS-PROMPT.md
 └── examples/
-    └── sample.md
+    └── SAMPLE.md
 ```
 
 ## License
