@@ -1,105 +1,116 @@
 # agentskill
 
-Generate AGENTS.md from your actual coding style.
+Analyze a code repository and synthesize an `AGENTS.md` that lets any agent produce code indistinguishable from the existing codebase.
+
+---
 
 ## What It Does
 
-1. **Scans repos** -- source files, git history, tooling configs.
-2. **Detects style** -- naming, error handling, comments, spacing, imports.
-3. **Synthesizes** -- complete AGENTS.md with red lines, overview, per-language sections, repo structure, git patterns, code examples.
+agentskill is not a linter and not a style guide generator. It is a forensic extraction tool. It walks a repository, measures every line, reads every config file, and inspects the commit log — then synthesizes a precise behavioral spec for a code-generating agent.
+
+The output is not advice. It is mimicry instructions.
+
+---
+
+## How It Works
+
+Seven analysis scripts run in parallel. Each extracts one class of signal that an LLM cannot derive reliably from reading source files alone:
+
+| Script       | What it measures                                                    |
+| ------------ | ------------------------------------------------------------------- |
+| `scan.py`    | Directory tree, file inventory, suggested read order                |
+| `measure.py` | Exact indentation, line length percentiles, blank line distributions |
+| `config.py`  | Formatter, linter, and type-checker detection with config excerpts  |
+| `git.py`     | Commit prefixes, branch naming, merge strategy, signing             |
+| `graph.py`   | Internal import graph, circular dependencies, most-depended modules |
+| `symbols.py` | Symbol name extraction, naming pattern clustering, affix detection  |
+| `tests.py`   | Test-to-source mapping, framework detection, fixture extraction     |
+
+Script output feeds directly into `AGENTS.md` synthesis. The synthesis step follows the behavioral spec in [`SYSTEM.md`](./SYSTEM.md).
+
+---
 
 ## Install
 
 ```bash
-# Generate AGENTS.md
-python3 scripts/agentskill.py ~/projects/myapp
-
-# Raw JSON analysis
-python3 scripts/agentskill.py ~/projects/repo1 ~/projects/repo2 --json -o report.json
-
-# Skip sections
-python3 scripts/agentskill.py ~/projects/myapp --skip-git --skip-tooling
-
-# Install as package
-pip install .
-agentskill ~/projects/myapp
+pip install -e .
 ```
 
-## Detected Patterns
+---
 
-| Category | What It Finds |
-|----------|---------------|
-| **Naming** | Dominant case style per category (vars, functions, types, consts), average length |
-| **Error Handling** | Rust: unwrap/expect/?/panic/Result counts. Python: try/except/raise/assert/with |
-| **Comments** | Density, doc vs normal, style (/// vs // vs #) |
-| **Spacing** | Average blank lines between code blocks |
-| **Imports** | Rust: std/crate/external. Python: stdlib/third-party |
-| **Git** | Commit prefixes, average length, branch naming, signing |
-| **Tooling** | Cargo, npm, pytest, CI, lockfiles, Docker, editorconfig, license detection |
-| **Structure** | File naming, directory depth, test organization, module patterns |
-| **Commands** | Install, dev, build, test, lint, format, CI workflows |
+## Usage
 
-## Languages
+```bash
+# Run all scripts and synthesize a report
+python cli.py analyze <repo> --pretty
 
-Every language is supported via a language-agnostic analysis engine. Files are grouped by extension and analyzed through text pattern detection — no language-specific analyzers required.
+# Run individual scripts
+python cli.py scan <repo> --pretty
+python cli.py measure <repo> --lang python --pretty
+python cli.py config <repo> --pretty
+python cli.py git <repo> --pretty
+python cli.py graph <repo> --pretty
+python cli.py symbols <repo> --pretty
+python cli.py tests <repo> --pretty
 
-## Output Sections
+# Write output to file
+python cli.py analyze <repo> --out report.json
 
-Generated AGENTS.md files are ordered by priority:
+# Run a script directly
+python scripts/scan.py <repo> --pretty
+```
 
-1. **Red Lines** -- hard constraints, what not to do
-2. **Overview** -- project context and key principles
-3. **Cross-Language Patterns** -- universal naming, comments, errors
-4. **Language Sections** -- per-language details
-5. **Commands and Workflows** -- install, test, lint, build, CI
-6. **Git** -- commits, branches, signing
-7. **Repository Structure** -- tree view, file naming, depth
-8. **Tooling** -- detected configs
-9. **Dependencies** -- package managers, pin style
-10. **Code Examples** -- actual patterns from the codebase
+---
+
+## Repository Structure
+
+```
+cli.py              # unified entry point — subcommand dispatch only
+pyproject.toml      # build metadata and entry point declaration
+SYSTEM.md           # behavioral spec for AGENTS.md generation — never modify
+SKILL.md            # operational workflow — never modify
+AGENTS.md           # conventions for this repo itself
+scripts/
+  scan.py           # directory tree walk, file inventory, read order
+  measure.py        # indentation, line lengths, blank lines, trailing whitespace
+  config.py         # formatter/linter/type-checker detection from config files
+  git.py            # commit log parsing, branch analysis, merge strategy
+  graph.py          # internal import graph, cycle detection, monorepo detection
+  symbols.py        # symbol name extraction and naming pattern clustering
+  tests.py          # test-to-source mapping, framework detection, fixture extraction
+references/
+  GOTCHAS.md        # extraction and synthesis errors to avoid
+examples/
+  SINGLE_LANGUAGE.md   # reference output: single-language repo
+  MULTI_LANGUAGE.md    # reference output: multi-language single repo
+  MONOREPO.md          # reference output: monorepo with multiple services
+```
+
+---
+
+## File Ecosystem
+
+Three files govern behavior. Read all three before modifying anything.
+
+| File            | Role                                                                               |
+| --------------- | ---------------------------------------------------------------------------------- |
+| `SYSTEM.md`     | The canonical spec: what every section of `AGENTS.md` must contain and how to evaluate it |
+| `SKILL.md`      | The operational workflow: when to invoke, what scripts to run, in what order       |
+| `GOTCHAS.md`    | Extraction and synthesis errors from previous runs — read before writing           |
+
+---
 
 ## Examples
 
-- **SIMPLE.md** -- single-language project (most common scenario)
-- **MONOREPO.md** -- multi-language, multi-project monorepo
+The `examples/` directory contains three reference `AGENTS.md` files, each representing a distinct repo shape:
 
-## Structure
+- **`SINGLE_LANGUAGE.md`** — a Go HTTP service with no external tooling
+- **`MULTI_LANGUAGE.md`** — a Python/TypeScript project with shared conventions
+- **`MONOREPO.md`** — a multi-service monorepo with per-service sections
 
-```
-agentskill/
-├── SKILL.md
-├── README.md
-├── setup.py
-├── scripts/
-│   └── agentskill.py          # CLI entry point
-├── agentskill/                # Core package
-│   ├── __init__.py
-│   ├── cli.py                 # Pipeline orchestration
-│   ├── constants.py           # Shared constants
-│   ├── engine.py              # Language-agnostic analysis engine
-│   ├── extractors/
-│   │   ├── commands.py        # Commands and workflows
-│   │   ├── filesystem.py      # Scanning, tooling, metadata
-│   │   ├── git.py             # Commits, branches, config, remotes
-│   │   └── structure.py      # Repo structure and conventions
-│   └── synthesis/
-│       └── __init__.py        # AGENTS.md generation
-├── references/
-│   ├── GOTCHAS.md
-│   ├── OUTPUT-TEMPLATE.md
-│   └── SYNTHESIS-PROMPT.md
-├── examples/
-│   ├── SIMPLE.md              # Single-language output
-│   └── MONOREPO.md            # Multi-language output
-└── tests/
-    └── test_agentskill.py
-```
+Consult the relevant example before handling an unfamiliar repo shape.
 
-## Testing
-
-```bash
-python3 tests/test_agentskill.py
-```
+---
 
 ## License
 
