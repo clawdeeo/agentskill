@@ -1,124 +1,71 @@
 # agentskill
 
-Generate AGENTS.md from your actual coding style. Analyzes repositories and synthesizes a personal conventions document that captures how you actually write code — not how you think you do.
+Generate AGENTS.md from your actual coding style.
 
 ## What It Does
 
-1. **Scans your repos** — Extracts patterns from git history, source files, and configs
-2. **Detects style** — Naming conventions, error handling, comment philosophy, spacing habits
-3. **Synthesizes AGENTS.md** — Turns the data into a clean, actionable style guide
+1. **Scans repos** — git history, source files, configs.
+2. **Detects style** — naming, errors, comments, spacing.
+3. **Synthesizes** — clean AGENTS.md via LLM.
 
-## Installation
-
-As an OpenClaw skill:
+## Install
 
 ```bash
 clawhub install clawdeeo/agentskill
 ```
 
-Or use the extraction script standalone:
-
+Or standalone:
 ```bash
 python3 scripts/extract.py /path/to/repo
 ```
 
 ## Usage
 
-### With OpenClaw
-
+With OpenClaw:
 ```
-> Analyze my coding style from ~/projects/gitclaw and ~/projects/myapp
+> Analyze my coding style from ~/projects/myapp
 ```
 
-The skill will:
-- Run extraction on both repos
-- Synthesize a draft AGENTS.md
-- Let you iterate on it
-
-### Standalone Script
-
+Standalone:
 ```bash
-python3 scripts/extract.py ~/projects/gitclaw ~/projects/myapp -o report.json
-cat report.json | jq '.code_style.rust.naming_descriptiveness'
+python3 scripts/extract.py ~/projects/myapp -o report.json
 ```
 
-## What Gets Detected
+## Detected Patterns
 
 | Category | Patterns |
 |----------|----------|
-| **Naming** | Case style, average name length by symbol type, descriptiveness |
-| **Spacing** | Blank line habits between blocks |
-| **Comments** | Style (// vs ///), density, what gets documented |
-| **Error handling** | unwrap vs ? vs Result, panic tolerance |
-| **Git** | Commit prefixes, branch naming, PR style |
-| **Tooling** | Linters, formatters, CI configs |
+| **Naming** | case style, avg length, descriptiveness |
+| **Spacing** | blank lines between blocks |
+| **Comments** | style, density, what gets explained |
+| **Errors** | unwrap vs ? vs Result |
+| **Git** | commit prefixes, branches |
+| **Tooling** | linters, CI configs |
 
-## Multi-Language Support
+## Languages
 
-Detects and documents patterns across **all languages** found in your repos:
+- **Rust** — full analysis
+- **Python** — naming, comments
+- **Go** — file detection + git
+- **JS/TS** — file detection + git
 
-- **Rust** — Full analysis (naming, errors, comments, spacing)
-- **Python** — Naming, comments, function metrics
-- **Go** — File detection + git patterns
-- **JavaScript/TypeScript** — File detection + git patterns
+PRs welcome for deeper support.
 
-Add more: extend `extract.py` with language-specific parsers.
-
-## File Structure
+## Structure
 
 ```
 agentskill/
-├── SKILL.md              # Skill instructions for OpenClaw
-├── README.md             # This file
-├── scripts/
-│   └── extract.py        # Multi-language extraction engine
+├── SKILL.md
+├── README.md
+├── scripts/extract.py
 ├── references/
-│   ├── synthesis-prompt.md   # LLM prompt template
-│   ├── output-template.md    # AGENTS.md structure guide
-│   └── GOTCHAS.md            # Common extraction errors to avoid
+│   ├── synthesis-prompt.md
+│   ├── output-template.md
+│   └── GOTCHAS.md
 └── examples/
-    └── gitclaw-airscript.md  # Example synthesized AGENTS.md
-```
-
-## Output Example
-
-```markdown
-# AGENTS.md — Coding Style
-
-## Overview
-Pragmatic Rustacean. Prefers explicit over clever, early extraction,
-zero tolerance for dead code.
-
-## Rust
-
-### Naming
-- Variables: snake_case (avg length: 12 chars)
-- Types: PascalCase (avg length: 18 chars)
-- Constants: SCREAMING_SNAKE_CASE
-
-### Comments
-- Minimal. Prefer doc comments (///) for public APIs.
-- Density: ~5% of code lines.
-- No inline comments explaining "what" — only "why".
-
-### Spacing
-- One blank line between functions.
-- Two blank lines between modules.
-
-### Error Handling
-- Propagate with `?` in library code.
-- Never `unwrap()` — always handle or expect with message.
-
-## Git
-- Branches: fix/, feat/, docs/, chore/
-- Commits: conventional format, lowercase
-- PR titles: lowercase
-
-## Red Lines
-- Never commit to main.
-- No dead code — remove, don't #[allow].
+    └── sample.md
 ```
 
 ## License
 
-MIT © Francesco Sardone (Airscript)
+MIT

@@ -1,85 +1,65 @@
-# Synthesis Prompt for AGENTS.md Generation
+# Synthesis Prompt
 
-You are a coding style analyst. You have been given a structured report extracted from one or more repositories. Your job is to synthesize a clean, actionable AGENTS.md file that captures the user's personal coding philosophy and conventions across **all detected languages**.
+Synthesize AGENTS.md from extraction report. Multi-language.
 
 ## Input
 
-You will receive a JSON report with:
-- `repos`: List of analyzed repositories
-- `analyses`: Per-repo analysis containing:
-  - `languages`: Analysis per language (naming, errors, comments, file counts)
-  - `code_style`: Language-agnostic style patterns (naming descriptiveness, blank lines, comment patterns)
-  - `git`: Commit and branch patterns
-  - `tooling`: Detected tooling configs
+```json
+{
+  "repos": [...],
+  "analyses": [{
+    "languages": { "rust": {...}, "python": {...} },
+    "code_style": { "naming_descriptiveness": {...}, "blank_lines": {...} },
+    "git": { "commits": {...}, "branches": {...} },
+    "tooling": {...}
+  }]
+}
+```
 
-## Output Format
-
-Generate AGENTS.md in this structure:
+## Output Structure
 
 ```markdown
-# AGENTS.md — Coding Style: [Username]
+# AGENTS.md
 
 ## Overview
-One-paragraph summary capturing philosophy across all languages.
+One-paragraph philosophy.
 
 ## Cross-Language Patterns
-### Naming
-Patterns that hold across languages (if any)
+Patterns holding across langs (if any).
 
-### Comments
-- Density, style, philosophy
+## [Language]
+### Naming
+case style, avg length, descriptiveness
 
 ### Error Handling
-General approach (if consistent)
-
-## [Language 1]
-### Naming
-- vars: case style (avg length if notable)
-- types: case style
-- functions: case style + descriptiveness note
-
-### Error Handling
-Specific patterns
+patterns
 
 ### Comments
-Density, what gets documented
+density, style
 
-### Functions
-Length guidance
-
-### Tooling
-Language-specific tools
-
-## [Language 2]
-... repeat ...
+### Spacing
+blank line habits
 
 ## Git
-- Commits: format, prefixes, length, style
-- Branches: naming, workflow type
-- PRs: inferred style
+- Commits: format, prefixes, length
+- Branches: naming
 
 ## Tooling
-Global tooling across projects
 
 ## Red Lines
-Things explicitly avoided or disallowed
+Explicit avoidances
 
 ---
 **Source:** repo names + stats
-**Confidence:** High/Medium/Low annotations on non-obvious claims
+**Confidence:** High/Medium/Low on claims
 ```
 
 ## Rules
 
-1. **Multi-language first.** Document patterns for every language found, even if brief.
-2. **Cross-language section.** If patterns hold across languages (e.g., always descriptive names), document once at the top.
-3. **Only what data supports.** Flag uncertainty with confidence annotations.
-4. **Distinguish preference from convention.** Use "Project-specific" when pattern only appears in one repo.
-5. **Avoid universal truths.** "Uses snake_case in Rust" is noise unless it's a deviation.
-6. **Contextualize.** High `unwrap` in a CLI is different than in a library.
-7. **Check GOTCHAS.md first.** Avoid the documented pitfalls.
-
-## Confidence Annotations
-
-Use inline: "descriptive function names (High)" or section footers:
-"**Confidence:** High on naming; Medium on branch patterns (limited sample)"
+1. **Multi-language.** Document every language found.
+2. **Cross-language top.** Shared patterns once at top.
+3. **Data only.** Omit if ambiguous; annotate confidence.
+4. **Flag project-specific.** Single-repo patterns labeled.
+5. **No universal noise.** Skip obvious (e.g., snake_case in Rust).
+6. **Contextualize.** unwrap in CLI != library.
+7. **Read GOTCHAS.md first.**
