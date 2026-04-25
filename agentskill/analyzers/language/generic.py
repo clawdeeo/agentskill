@@ -77,5 +77,7 @@ class GenericAnalyzer(LanguageAnalyzer):
                 "avg_file_lines": avg_file_lines,
                 "total_lines": total_lines,
             },
+            type_annotations={},
+            import_order={"style": "unknown"},
             file_count=len(files),
         )

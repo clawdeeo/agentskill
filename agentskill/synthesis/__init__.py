@@ -156,20 +156,29 @@ class AgentSynthesizer:
                     dominant = info.get("dominant_case", "unknown")
                     lines.append(f"- **{category.title()}:** {dominant}")
 
-        # Type annotations (Python)
-        metrics = data.get("metrics", {})
-        if "type_annotation_density" in metrics:
+        # Type Annotations
+        type_annotations = data.get("type_annotations", {})
+        if type_annotations and type_annotations.get("total_functions", 0) > 0:
             lines.append("")
             lines.append("### Type Annotations")
-            density = metrics["type_annotation_density"]
-            return_density = metrics.get("return_annotation_density", 0)
+            density = type_annotations.get("param_density", 0)
+            return_density = type_annotations.get("return_density", 0)
             if density > 0.5:
-                lines.append(f"- **Density:** High ({density:.0%} of params)")
+                lines.append(f"- **Param density:** High ({density:.0%})")
             elif density > 0.2:
-                lines.append(f"- **Density:** Medium ({density:.0%} of params)")
+                lines.append(f"- **Param density:** Medium ({density:.0%})")
             else:
-                lines.append(f"- **Density:** Low ({density:.0%} of params)")
-            lines.append(f"- **Return annotations:** {return_density:.0%} of functions")
+                lines.append(f"- **Param density:** Low ({density:.0%})")
+            lines.append(f"- **Return density:** {return_density:.0%}")
+
+        # Import Order
+        import_order = data.get("import_order", {})
+        if import_order and import_order.get("style"):
+            style = import_order["style"]
+            if style != "unknown":
+                lines.append("")
+                lines.append("### Import Order")
+                lines.append(f"- **Style:** {style}")
 
         # Error Handling
         errors = data.get("error_handling", {})
