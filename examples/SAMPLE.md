@@ -1,5 +1,15 @@
 # AGENTS.md — Coding Style
 
+## Red Lines
+
+Explicit avoidances based on actual patterns:
+
+- Never `panic!` — controlled failure only
+- Never `expect()` with messages — unwrap or propagate
+- No verbose comments — self-document or omit
+- Never mix naming conventions within a category
+- Fail fast over defensive in CLI context
+
 ## Overview
 
 Multi-language codebase spanning Go, Python, Rust. Analyzed 3 repositories (cli-tools, web-api, utils-lib). Pragmatic tool-builder: self-documenting code over verbose comments, descriptive function names over terse ones, fail-fast over defensive error handling. Conventional commit discipline with lean, action-oriented messages.
@@ -113,23 +123,6 @@ Patterns holding across all detected languages:
 
 ---
 
-## Repository Structure
-
-### File Naming
-- **Dominant style:** snake_case
-
-### Directory Depth
-- **Max:** 5 levels
-- **Average:** 2.3 levels
-
-### Test Organization
-- **Location:** separate_dirs
-- **Frameworks:** pytest, cargo test
-
-### Module Patterns
-- **Barrel files:** mod.rs, lib.rs detected
-- **Init files:** __init__.py detected
-
 ## Commands and Workflows
 
 ### Install
@@ -209,6 +202,23 @@ cargo test --all-features
 - Primary: GitHub
 - Remote count: 1 per repository
 
+## Repository Structure
+
+### File Naming
+- **Dominant style:** snake_case
+
+### Directory Depth
+- **Max:** 5 levels
+- **Average:** 2.3 levels
+
+### Test Organization
+- **Location:** separate_dirs
+- **Frameworks:** pytest, cargo test
+
+### Module Patterns
+- **Barrel files:** mod.rs, lib.rs detected
+- **Init files:** __init__.py detected
+
 ## Tooling
 
 Detected configurations:
@@ -229,16 +239,6 @@ Detected configurations:
 ### Philosophy
 - **Average dependency count:** 12 per project
 - **Pin style:** locked
-
-## Red Lines
-
-Explicit avoidances based on actual patterns:
-
-- Never `panic!` — controlled failure only
-- Never `expect()` with messages — unwrap or propagate
-- No verbose comments — self-document or omit
-- Never mix naming conventions within a category
-- Fail fast over defensive in CLI context
 
 ## Code Examples
 
