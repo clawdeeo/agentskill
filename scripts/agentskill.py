@@ -10,6 +10,37 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 
 
+SAMPLE_SIZE_SMALL = 30
+SAMPLE_SIZE_MEDIUM = 50
+COMMIT_LOG_LIMIT = 100
+
+GIT_TIMEOUT = 30
+
+EXTENSIONS = {
+    "rust": [".rs"],
+    "python": [".py"],
+    "javascript": [".js", ".mjs"],
+    "typescript": [".ts", ".tsx"],
+    "go": [".go"],
+    "bash": [".sh"],
+}
+
+TOOL_FILES = {
+    "rustfmt.toml": "rustfmt",
+    ".rustfmt.toml": "rustfmt",
+    "Cargo.toml": "cargo",
+    ".github/workflows": "GitHub Actions",
+    ".gitignore": "git",
+    "Makefile": "make",
+    "justfile": "just",
+    ".pre-commit-config.yaml": "pre-commit",
+}
+
+SKIP_DIRS = {'node_modules', 'target', '__pycache__'}
+
+PYTHON_VAR_KEYWORDS = {'self', 'cls', 'if', 'for', 'while'}
+
+
 @dataclass
 class NamingPatterns:
     vars: Dict[str, int] = None
@@ -63,9 +94,6 @@ class Report:
     architecture: Dict
 
 
-# Naming
-
-
 def detect_case_style(s: str) -> str:
     if s.isupper() and '_' in s:
         return "SCREAMING_SNAKE_CASE"
@@ -80,14 +108,11 @@ def detect_case_style(s: str) -> str:
     return "mixed"
 
 
-# Git analysis
-
-
 def analyze_git_commits(repo_path: str) -> Dict:
     try:
         result = subprocess.run(
-            ["git", "-C", repo_path, "log", "--pretty=format:%s", "-100"],
-            capture_output=True, text=True, timeout=30
+            ["git", "-C", repo_path, "log", "--pretty=format:%s", f"-{COMMIT_LOG_LIMIT}"],
+            capture_output=True, text=True, timeout=GIT_TIMEOUT
         )
         commits = result.stdout.strip().split('\n') if result.stdout else []
 
@@ -117,7 +142,7 @@ def analyze_branches(repo_path: str) -> Dict:
     try:
         result = subprocess.run(
             ["git", "-C", repo_path, "branch", "-a"],
-            capture_output=True, text=True, timeout=30
+            capture_output=True, text=True, timeout=GIT_TIMEOUT
         )
         branches = [b.strip().strip('* ') for b in result.stdout.split('\n') if b.strip()]
 
@@ -137,37 +162,22 @@ def analyze_branches(repo_path: str) -> Dict:
         return {}
 
 
-# File scanning
-
-
 def scan_source_files(repo_path: str) -> Dict[str, List[Path]]:
-    extensions = {
-        "rust": [".rs"],
-        "python": [".py"],
-        "javascript": [".js", ".mjs"],
-        "typescript": [".ts", ".tsx"],
-        "go": [".go"],
-        "bash": [".sh"],
-    }
-
-    files_by_lang = {lang: [] for lang in extensions}
+    files_by_lang = {lang: [] for lang in EXTENSIONS}
 
     for root, _, files in os.walk(repo_path):
         if any(part.startswith('.') for part in Path(root).parts):
             continue
-        if 'node_modules' in root or 'target' in root or '__pycache__' in root:
+        if SKIP_DIRS.intersection(Path(root).parts):
             continue
 
         for file in files:
             filepath = Path(root) / file
-            for lang, exts in extensions.items():
+            for lang, exts in EXTENSIONS.items():
                 if any(file.endswith(ext) for ext in exts):
                     files_by_lang[lang].append(filepath)
 
     return {k: v for k, v in files_by_lang.items() if v}
-
-
-# Code style analysis
 
 
 def analyze_code_style(files: List[Path], language: str) -> CodeStyle:
@@ -177,7 +187,7 @@ def analyze_code_style(files: List[Path], language: str) -> CodeStyle:
     blank_line_counts = []
     comment_styles = {"///": 0, "//!": 0, "//": 0, "/*": 0, "#": 0}
 
-    for filepath in files[:30]:
+    for filepath in files[:SAMPLE_SIZE_SMALL]:
         try:
             content = filepath.read_text(errors='ignore')
             lines = content.split('\n')
@@ -228,7 +238,7 @@ def analyze_code_style(files: List[Path], language: str) -> CodeStyle:
                 elif language == "python":
                     if re.match(r'^\s*\w+\s*=\s*', line) and not line.strip().startswith('#'):
                         match = re.match(r'^\s*(\w+)\s*=', line)
-                        if match and match.group(1) not in ['self', 'cls', 'if', 'for', 'while']:
+                        if match and match.group(1) not in PYTHON_VAR_KEYWORDS:
                             name_lengths["vars"].append(len(match.group(1)))
                     if re.match(r'^def\s+\w+', line):
                         match = re.search(r'def\s+(\w+)', line)
@@ -254,16 +264,13 @@ def analyze_code_style(files: List[Path], language: str) -> CodeStyle:
     return style
 
 
-# Language-specific analysis
-
-
 def analyze_rust_files(files: List[Path]) -> Dict:
     naming = {"vars": {}, "types": {}, "consts": {}, "functions": {}}
     error_patterns = {"unwrap": 0, "expect": 0, "?": 0, "Result": 0, "panic": 0}
     comment_lines = 0
     code_lines = 0
 
-    for filepath in files[:50]:
+    for filepath in files[:SAMPLE_SIZE_MEDIUM]:
         try:
             content = filepath.read_text(errors='ignore')
             lines = content.split('\n')
@@ -323,25 +330,11 @@ def analyze_rust_files(files: List[Path]) -> Dict:
     }
 
 
-# Tooling detection
-
-
 def detect_tooling(repo_path: str) -> Dict:
     repo = Path(repo_path)
-
-    tool_files = {
-        "rustfmt.toml": "rustfmt",
-        ".rustfmt.toml": "rustfmt",
-        "Cargo.toml": "cargo",
-        ".github/workflows": "GitHub Actions",
-        ".gitignore": "git",
-        "Makefile": "make",
-        "justfile": "just",
-        ".pre-commit-config.yaml": "pre-commit",
-    }
-
     detected = {}
-    for file_pattern, tool in tool_files.items():
+
+    for file_pattern, tool in TOOL_FILES.items():
         if (repo / file_pattern).exists():
             detected[tool] = True
 
@@ -349,9 +342,6 @@ def detect_tooling(repo_path: str) -> Dict:
         detected["GitHub Actions CI"] = True
 
     return detected
-
-
-# Main report generation
 
 
 def analyze_repo(repo_path: str) -> Dict:
@@ -390,9 +380,6 @@ def analyze_repo(repo_path: str) -> Dict:
     return report
 
 
-# CLI
-
-
 def convert_dataclasses(obj):
     if isinstance(obj, dict):
         return {k: convert_dataclasses(v) for k, v in obj.items()}
@@ -404,18 +391,9 @@ def convert_dataclasses(obj):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Extract coding style metrics from repositories"
-    )
-    parser.add_argument(
-        "repos",
-        nargs="+",
-        help="Paths to repositories to analyze"
-    )
-    parser.add_argument(
-        "-o", "--output",
-        help="Output file (default: stdout)"
-    )
+    parser = argparse.ArgumentParser(description="Extract coding style metrics from repositories")
+    parser.add_argument("repos", nargs="+", help="Paths to repositories to analyze")
+    parser.add_argument("-o", "--output", help="Output file (default: stdout)")
 
     args = parser.parse_args()
 
