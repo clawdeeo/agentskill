@@ -1,0 +1,20 @@
+# ROADMAP
+
+Bugs and improvements found during self-analysis of agentskill.
+Remove items as they are completed.
+
+## Bugs
+
+- [x] **Comment density inflated** — engine counts docstrings as comments, giving 87.4% on itself. Fixed by only counting doc comments on their opening/closing lines, not treating every line inside a docstring as a comment.
+- [x] **Files analyzed counter shows 0** — output says "Files analyzed: 0" but still produces data. Fixed: synthesis was reading `lang.file_count` but engine stores it in `lang.metrics.file_count`.
+- [x] **PascalCase class detection broken** — Python classes (including @dataclass decorated) not detected as PascalCase types. Fixed by using word-boundary regex (`\bclass\b`) instead of substring matching.
+- [x] **SCREAMING_SNAKE_CASE constants not detected** — module-level constants not recognized. Fixed by detecting module-level SCREAMING_SNAKE_CASE assignments (`NAME = ...`) as consts.
+- [x] **Wrong comment style in examples** — Python code blocks show `//` comments. Fixed by mapping file extension to comment syntax (`#` for Python, `//` for Rust/Go/JS, etc.).
+- [x] **Git branch extraction parses HEAD incorrectly** — shows `HEAD -> origin/main` as a branch name. Fixed by filtering out HEAD pointer lines before processing branch prefixes.
+- [x] **Red Lines are generic defaults** — not derived from actual code patterns. Fixed by deriving from actual naming dominance, error handling patterns, and comment ratios.
+- [x] **Commands section empty despite setup.py and scripts/** — extractors/commands.py missing detection for console_scripts, scripts folder, or common CLI entry points. Fixed by adding `_extract_from_setup_py`, `_extract_from_requirements`, `_extract_from_tox`, and `_extract_from_scripts`.
+
+## Improvements
+
+- [ ] Update SKILL.md — still references old `analyzers/` architecture that was refactored away.
+- [ ] Update examples/SAMPLE.md — still shows old per-language coding-style format, not current AGENTS.md output.

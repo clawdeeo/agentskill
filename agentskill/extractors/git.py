@@ -62,6 +62,9 @@ def extract_branch_prefixes(branches: List[str]) -> Dict[str, int]:
     prefixes = {}
     for branch in branches:
         branch = branch.replace(REMOTE_PREFIX, '')
+        # Skip HEAD pointer lines and detached HEAD references
+        if 'HEAD' in branch or ' -> ' in branch:
+            continue
         parts = branch.split('/')
         if len(parts) > 1:
             prefix = parts[0]
@@ -74,6 +77,8 @@ def analyze_branches(repo_path: str) -> Dict:
     try:
         stdout = run_git_branch(repo_path)
         branches = [b.strip().strip('* ') for b in stdout.split('\n') if b.strip()]
+        # Filter out HEAD pointers and detached HEAD refs
+        branches = [b for b in branches if 'HEAD' not in b and ' -> ' not in b]
 
         prefixes = extract_branch_prefixes(branches)
 

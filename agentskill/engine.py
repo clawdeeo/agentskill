@@ -95,31 +95,34 @@ def analyze_file_content(filepath: Path, content: str) -> Dict:
             current_blank_streak = 0
         
         # Comment detection (language agnostic patterns)
-        if stripped.startswith('///') or stripped.startswith('//!'):
+        # Handle continuation of multi-line doc comments first
+        if in_doc_comment:
+            comments["total"] += 1
             comments["doc"] += 1
-            comments["total"] += 1
-        elif stripped.startswith('/**') or stripped.startswith('/*'):
-            comments["doc"] += 1
-            comments["total"] += 1
-            in_doc_comment = True
-            doc_comment_marker = '*/'
-        elif stripped.startswith('"""') or stripped.startswith("'''"):
-            if in_doc_comment and doc_comment_marker in stripped:
-                in_doc_comment = False
-                doc_comment_marker = None
-            else:
-                comments["doc"] += 1
-                comments["total"] += 1
-                in_doc_comment = True
-                doc_comment_marker = '"""' if '"""' in stripped else "'''"
-        elif stripped.startswith('//') or stripped.startswith('#'):
-            comments["normal"] += 1
-            comments["total"] += 1
-        elif in_doc_comment:
-            comments["total"] += 1
             if doc_comment_marker and doc_comment_marker in stripped:
                 in_doc_comment = False
                 doc_comment_marker = None
+        elif stripped.startswith('///') or stripped.startswith('//!'):
+            comments["doc"] += 1
+            comments["total"] += 1
+        elif stripped.startswith('/*'):
+            comments["doc"] += 1
+            comments["total"] += 1
+            # Only enter multi-line mode if closing marker is not on same line
+            if '*/' not in stripped:
+                in_doc_comment = True
+                doc_comment_marker = '*/'
+        elif stripped.startswith('"""') or stripped.startswith("'''"):
+            comments["doc"] += 1
+            comments["total"] += 1
+            quote = '"""' if stripped.startswith('"""') else "'''"
+            # Only enter multi-line mode if closing quote is not on same line
+            if stripped.count(quote) < 2:
+                in_doc_comment = True
+                doc_comment_marker = quote
+        elif stripped.startswith('//') or stripped.startswith('#'):
+            comments["normal"] += 1
+            comments["total"] += 1
         
         # Extract identifiers and categorize by context
         identifiers = extract_identifiers(line)
@@ -127,12 +130,14 @@ def analyze_file_content(filepath: Path, content: str) -> Dict:
             style = detect_case_style(name)
             
             # Categorize based on surrounding context
-            if 'const' in line.lower() or 'static' in line.lower():
+            if re.search(r'\b(const|static)\b', line, re.I):
                 naming["consts"][style] = naming["consts"].get(style, 0) + 1
-            elif any(kw in line for kw in ['struct', 'class', 'enum', 'trait', 'interface', 'type']):
+            elif re.search(r'\b(struct|class|enum|trait|interface|type)\b', line):
                 naming["types"][style] = naming["types"].get(style, 0) + 1
-            elif any(kw in line for kw in ['def', 'fn', 'func', 'function']):
+            elif re.search(r'\b(def|fn|func|function)\b', line):
                 naming["functions"][style] = naming["functions"].get(style, 0) + 1
+            elif style == "SCREAMING_SNAKE_CASE" and re.match(r'^\s*' + re.escape(name) + r'\s*[=:]', line):
+                naming["consts"][style] = naming["consts"].get(style, 0) + 1
             else:
                 naming["vars"][style] = naming["vars"].get(style, 0) + 1
         
@@ -197,6 +202,16 @@ def extract_code_examples(files: List[Path], max_examples: int = 10) -> List[str
     """Extract representative code examples from files."""
     examples = []
     
+    ext_to_comment = {
+        '.py': '#', '.rb': '#', '.sh': '#', '.bash': '#', '.zsh': '#',
+        '.pl': '#', '.pm': '#', '.r': '#', '.awk': '#', '.sed': '#',
+        '.rs': '//', '.go': '//', '.js': '//', '.ts': '//', '.mjs': '//',
+        '.java': '//', '.kt': '//', '.swift': '//', '.c': '//', '.cpp': '//',
+        '.cc': '//', '.h': '//', '.hpp': '//', '.cs': '//', '.scala': '//',
+        '.php': '//', '.lua': '--', '.sql': '--', '.vim': '"',
+        '.hs': '--', '.ml': '(*', '.clj': ';;', '.ex': '#',
+    }
+
     for filepath in files[:max_examples]:
         try:
             content = filepath.read_text(errors='ignore')
@@ -217,7 +232,8 @@ def extract_code_examples(files: List[Path], max_examples: int = 10) -> List[str
                     interesting.append('\n'.join(context))
             
             if interesting:
-                examples.append(f"// From {filepath.name}:\n" + interesting[0])
+                comment = ext_to_comment.get(filepath.suffix, '//')
+                examples.append(f"{comment} From {filepath.name}:\n" + interesting[0])
         except Exception:
             continue
     

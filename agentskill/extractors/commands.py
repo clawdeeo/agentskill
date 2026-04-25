@@ -24,6 +24,10 @@ def extract_commands(repo_path: str) -> Dict:
     _extract_from_justfile(repo, commands)
     _extract_from_cargo(repo, commands)
     _extract_from_pyproject(repo, commands)
+    _extract_from_setup_py(repo, commands)
+    _extract_from_requirements(repo, commands)
+    _extract_from_tox(repo, commands)
+    _extract_from_scripts(repo, commands)
     _extract_from_docker(repo, commands)
     _extract_from_github_actions(repo, commands)
 
@@ -213,6 +217,112 @@ def _extract_from_pyproject(repo: Path, commands: Dict):
             })
     except Exception:
         pass
+
+
+def _extract_from_setup_py(repo: Path, commands: Dict):
+    """Extract install/test commands from setup.py."""
+    setup_py = repo / "setup.py"
+    if not setup_py.exists():
+        return
+
+    commands["install"].append({
+        "name": "pip install",
+        "command": "pip install -e .",
+        "source": "setup.py",
+    })
+    commands["install"].append({
+        "name": "setup.py install",
+        "command": "python setup.py install",
+        "source": "setup.py",
+    })
+
+    try:
+        content = setup_py.read_text(errors='ignore')
+        if "test_suite" in content or "pytest" in content or "unittest" in content:
+            commands["test"].append({
+                "name": "setup.py test",
+                "command": "python setup.py test",
+                "source": "setup.py",
+            })
+    except Exception:
+        pass
+
+
+def _extract_from_requirements(repo: Path, commands: Dict):
+    """Extract install command from requirements.txt."""
+    req = repo / "requirements.txt"
+    req_dev = repo / "requirements-dev.txt"
+
+    if req.exists():
+        commands["install"].append({
+            "name": "pip install requirements",
+            "command": "pip install -r requirements.txt",
+            "source": "requirements.txt",
+        })
+
+    if req_dev.exists():
+        commands["install"].append({
+            "name": "pip install dev requirements",
+            "command": "pip install -r requirements-dev.txt",
+            "source": "requirements-dev.txt",
+        })
+
+
+def _extract_from_tox(repo: Path, commands: Dict):
+    """Extract test environments from tox.ini."""
+    tox_ini = repo / "tox.ini"
+    if not tox_ini.exists():
+        return
+
+    commands["test"].append({
+        "name": "tox",
+        "command": "tox",
+        "source": "tox.ini",
+    })
+
+    try:
+        content = tox_ini.read_text(errors='ignore')
+        # Extract environment names like [testenv:py312] or [testenv:lint]
+        envs = re.findall(r'\[testenv:([^\]]+)\]', content)
+        for env in envs[:5]:
+            commands["test"].append({
+                "name": f"tox -e {env}",
+                "command": f"tox -e {env}",
+                "source": "tox.ini",
+            })
+    except Exception:
+        pass
+
+
+def _extract_from_scripts(repo: Path, commands: Dict):
+    """Extract CLI entry points from scripts/ folder and setup.py console_scripts."""
+    scripts_dir = repo / "scripts"
+    if scripts_dir.exists() and scripts_dir.is_dir():
+        for script in sorted(scripts_dir.iterdir())[:10]:
+            if script.is_file() and not script.name.startswith('.'):
+                commands["dev"].append({
+                    "name": script.name,
+                    "command": f"python {scripts_dir.name}/{script.name}",
+                    "source": f"{scripts_dir.name}/",
+                })
+
+    # Also check setup.py for console_scripts
+    setup_py = repo / "setup.py"
+    if setup_py.exists():
+        try:
+            content = setup_py.read_text(errors='ignore')
+            entry_points = re.findall(r'console_scripts\s*=\s*\[(.*?)\]', content, re.DOTALL)
+            for ep_block in entry_points:
+                # Extract "name = module.path:function" patterns
+                eps = re.findall(r'["\']([\w-]+)["\']\s*=\s*["\']([\w.]+):', ep_block)
+                for name, module in eps:
+                    commands["dev"].append({
+                        "name": name,
+                        "command": name,
+                        "source": "setup.py console_scripts",
+                    })
+        except Exception:
+            pass
 
 
 def _extract_from_docker(repo: Path, commands: Dict):

@@ -499,7 +499,7 @@ class AgentSynthesizer:
         source_str = ", ".join(repo_names)
 
         total_files = sum(
-            sum(lang.get("file_count", 0) for lang in a.get("languages", {}).values())
+            sum(lang.get("metrics", {}).get("file_count", 0) for lang in a.get("languages", {}).values())
             for a in analyses
         )
 
@@ -583,20 +583,63 @@ class AgentSynthesizer:
         return patterns
 
     def _extract_red_lines(self, analyses: List[Dict]) -> List[str]:
-        """Extract explicit avoidances."""
+        """Extract explicit avoidances from actual codebase patterns."""
         red_lines = []
 
-        # Check for absence of certain patterns
-        no_expect = all(
-            lang.get("error_handling", {}).get("expect", 0) == 0
-            for analysis in analyses
-            for lang in analysis.get("languages", {}).values()
-        )
-        if no_expect:
-            red_lines.append("Never `expect()` with messages — unwrap or propagate")
+        # Error handling red lines
+        has_unwrap = False
+        has_expect = False
+        for analysis in analyses:
+            for lang in analysis.get("languages", {}).values():
+                eh = lang.get("error_handling", {})
+                if eh.get("unwrap", 0) > 0:
+                    has_unwrap = True
+                if eh.get("expect", 0) > 0:
+                    has_expect = True
 
-        # Check for consistent style enforcement
-        red_lines.append("No mixing of naming conventions within categories")
+        if has_unwrap and not has_expect:
+            red_lines.append("Prefer unwrap() over expect() — fail fast without messages")
+        elif has_expect and not has_unwrap:
+            red_lines.append("Prefer expect() over unwrap() — always provide context on failure")
+
+        # Naming consistency red lines
+        naming_violations = []
+        for analysis in analyses:
+            for lang, data in analysis.get("languages", {}).items():
+                naming = data.get("naming", {})
+                for cat, info in naming.items():
+                    if isinstance(info, dict):
+                        counts = info.get("counts", {})
+                        total = sum(counts.values())
+                        if total > 0:
+                            max_count = max(counts.values())
+                            dominance = max_count / total
+                            if dominance >= 0.95:
+                                style = info.get("dominant_case", "unknown")
+                                naming_violations.append(f"Strict {style} for {cat}")
+
+        if naming_violations:
+            # Deduplicate while preserving order
+            seen = set()
+            for violation in naming_violations:
+                if violation not in seen:
+                    seen.add(violation)
+            # Only emit naming red lines if there are violations worth noting
+            if seen:
+                red_lines.append("No mixing naming conventions within categories")
+
+        # Comment style red lines — look at languages with meaningful comment volume
+        for analysis in analyses:
+            for lang, data in analysis.get("languages", {}).items():
+                comments = data.get("comments", {})
+                total = comments.get("total", 0)
+                doc = comments.get("doc", 0)
+                normal = comments.get("normal", 0)
+                if total > 10 and doc > normal * 2:
+                    red_lines.append("Doc comments over inline comments for API documentation")
+                    break
+            if "Doc comments over inline comments for API documentation" in red_lines:
+                break
 
         return red_lines
 
