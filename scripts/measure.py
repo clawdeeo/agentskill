@@ -19,6 +19,10 @@ from collections import Counter
 from pathlib import Path
 from statistics import median
 
+MAX_SMALL_INDENT = 8
+MIN_FILES_FOR_LINE_LENGTH = 5
+MAX_FILES_REPORTED = 10
+
 SKIP_DIRS: set[str] = {
     "node_modules", "__pycache__", "dist", "build", "out",
     "target", "vendor", "third_party", ".eggs", "site-packages",
@@ -28,26 +32,25 @@ SKIP_DIRS: set[str] = {
 }
 
 EXTENSIONS: dict[str, str] = {
-    ".py":   "python",
-    ".ts":   "typescript",
-    ".tsx":  "typescript",
-    ".js":   "javascript",
-    ".jsx":  "javascript",
-    ".mjs":  "javascript",
-    ".go":   "go",
-    ".rs":   "rust",
-    ".rb":   "ruby",
-    ".java": "java",
-    ".kt":   "kotlin",
+    ".py":    "python",
+    ".ts":    "typescript",
+    ".tsx":   "typescript",
+    ".js":    "javascript",
+    ".jsx":   "javascript",
+    ".mjs":   "javascript",
+    ".go":    "go",
+    ".rs":    "rust",
+    ".rb":    "ruby",
+    ".java":  "java",
+    ".kt":    "kotlin",
     ".swift": "swift",
-    ".cpp":  "cpp",
-    ".cc":   "cpp",
-    ".cxx":  "cpp",
-    ".c":    "c",
-    ".cs":   "csharp",
+    ".cpp":   "cpp",
+    ".cc":    "cpp",
+    ".cxx":   "cpp",
+    ".c":     "c",
+    ".cs":    "csharp",
 }
 
-# Regex patterns for top-level definitions per language
 TOP_LEVEL_DEF_RE: dict[str, re.Pattern] = {
     "typescript": re.compile(r"^(export\s+)?(default\s+)?(async\s+)?function\s+\w+|^(export\s+)?(abstract\s+)?class\s+\w+|^(export\s+)?const\s+\w+\s*=\s*(async\s+)?\("),
     "javascript": re.compile(r"^(export\s+)?(default\s+)?(async\s+)?function\s+\w+|^(export\s+)?(abstract\s+)?class\s+\w+|^(export\s+)?const\s+\w+\s*=\s*(async\s+)?\("),
@@ -65,6 +68,10 @@ METHOD_DEF_RE: dict[str, re.Pattern] = {
 }
 
 
+# ---------------------------------------------------------------------------
+# File collection
+# ---------------------------------------------------------------------------
+
 def _should_skip_dir(name: str) -> bool:
     return name in SKIP_DIRS or name.startswith(".")
 
@@ -80,21 +87,15 @@ def _collect_files(repo: Path, lang_filter: str | None) -> dict[str, list[Path]]
                 continue
             if lang_filter and lang != lang_filter:
                 continue
-            if lang not in by_lang:
-                by_lang[lang] = []
-            by_lang[lang].append(Path(dirpath) / fn)
+            by_lang.setdefault(lang, []).append(Path(dirpath) / fn)
     return by_lang
 
 
-def _percentile(sorted_data: list[int], p: int) -> int:
-    if not sorted_data:
-        return 0
-    idx = max(0, int(len(sorted_data) * p / 100) - 1)
-    return sorted_data[min(idx, len(sorted_data) - 1)]
-
+# ---------------------------------------------------------------------------
+# Indentation
+# ---------------------------------------------------------------------------
 
 def _measure_indentation(lines: list[str]) -> dict:
-    tab_lines: list[str] = []
     space_sizes: list[int] = []
     has_spaces = False
     has_tabs = False
@@ -104,7 +105,6 @@ def _measure_indentation(lines: list[str]) -> dict:
             continue
         if line.startswith("\t"):
             has_tabs = True
-            tab_lines.append(line)
         elif line.startswith(" "):
             has_spaces = True
             indent = len(line) - len(line.lstrip(" "))
@@ -115,20 +115,16 @@ def _measure_indentation(lines: list[str]) -> dict:
         return {"unit": "tabs", "size": 1}
     if not has_spaces:
         return {"unit": "unknown", "size": 0}
-
     if not space_sizes:
         return {"unit": "spaces", "size": 4}
 
-    # Mode of small indent values as the unit
-    small = [s for s in space_sizes if s <= 8]
+    small = [s for s in space_sizes if s <= MAX_SMALL_INDENT]
     if not small:
         return {"unit": "spaces", "size": 4}
 
     cnt = Counter(small)
-    # Most common indent level ≤ 8 that is a factor of others
     candidates = sorted(cnt.keys())
     unit = candidates[0]
-    # Prefer 2 or 4 if dominant
     for s in [2, 4]:
         if cnt[s] > cnt.get(unit, 0) * 0.5:
             unit = s
@@ -137,8 +133,35 @@ def _measure_indentation(lines: list[str]) -> dict:
     return {"unit": "spaces", "size": unit}
 
 
+def _consensus_indentation(
+    votes: list[dict],
+    tab_files: list[str],
+    mixed_files: list[str],
+) -> dict:
+    """Fold per-file indentation votes into a single consensus dict."""
+    units = Counter(v["unit"] for v in votes if v["unit"] != "unknown")
+    sizes = Counter(v["size"] for v in votes if v["unit"] != "unknown" and v["size"] > 0)
+    return {
+        "unit":        units.most_common(1)[0][0] if units else "spaces",
+        "size":        sizes.most_common(1)[0][0] if sizes else 4,
+        "tab_files":   tab_files[:MAX_FILES_REPORTED],
+        "mixed_files": mixed_files[:MAX_FILES_REPORTED],
+    }
+
+
+# ---------------------------------------------------------------------------
+# Line lengths
+# ---------------------------------------------------------------------------
+
+def _percentile(sorted_data: list[int], p: int) -> int:
+    if not sorted_data:
+        return 0
+    idx = max(0, int(len(sorted_data) * p / 100) - 1)
+    return sorted_data[min(idx, len(sorted_data) - 1)]
+
+
 def _measure_line_lengths(all_lengths: list[int]) -> dict:
-    if len(all_lengths) < 5:
+    if len(all_lengths) < MIN_FILES_FOR_LINE_LENGTH:
         return {}
     s = sorted(all_lengths)
     return {
@@ -150,6 +173,10 @@ def _measure_line_lengths(all_lengths: list[int]) -> dict:
     }
 
 
+# ---------------------------------------------------------------------------
+# Blank line helpers
+# ---------------------------------------------------------------------------
+
 def _count_blanks_before_line(lines: list[str], i: int) -> int:
     count = 0
     j = i - 1
@@ -159,12 +186,87 @@ def _count_blanks_before_line(lines: list[str], i: int) -> int:
     return count
 
 
+def _dist_summary(data: list[int]) -> dict:
+    if not data:
+        return {}
+    cnt = Counter(data)
+    mode = cnt.most_common(1)[0][0]
+    distribution = {str(k): v for k, v in sorted(cnt.items())}
+    return {"mode": mode, "distribution": distribution}
+
+
+# ---------------------------------------------------------------------------
+# Python blank line passes
+# ---------------------------------------------------------------------------
+
+def _blanks_between_top_level(tree: ast.AST, lines: list[str]) -> list[int]:
+    """Count blank lines before each top-level def/class."""
+    top_nodes = [
+        n for n in ast.walk(tree)
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+        and n.col_offset == 0
+    ]
+    top_nodes.sort(key=lambda n: n.lineno)
+    return [
+        _count_blanks_before_line(lines, n.lineno - 1)
+        for n in top_nodes
+        if n.lineno > 1
+    ]
+
+
+def _blanks_between_methods(tree: ast.AST, lines: list[str]) -> tuple[list[int], list[int]]:
+    """Count blank lines between class methods and after class declaration.
+
+    Returns (between_methods, after_class_decl).
+    """
+    between: list[int] = []
+    after_decl: list[int] = []
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ClassDef):
+            continue
+        methods = [
+            n for n in node.body
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+        ]
+        if not methods:
+            continue
+
+        after_decl.append(_count_blanks_before_line(lines, methods[0].lineno - 1))
+        for m in methods[1:]:
+            between.append(_count_blanks_before_line(lines, m.lineno - 1))
+
+    return between, after_decl
+
+
+def _blanks_after_imports(tree: ast.AST, lines: list[str]) -> list[int]:
+    """Count blank lines after the last import statement."""
+    import_lines = [
+        n.lineno for n in ast.walk(tree)
+        if isinstance(n, (ast.Import, ast.ImportFrom))
+    ]
+    if not import_lines:
+        return []
+
+    last_import = max(import_lines)
+    if last_import >= len(lines):
+        return []
+
+    count = 0
+    j = last_import  # 1-indexed → 0-indexed
+    while j < len(lines) and not lines[j].strip():
+        count += 1
+        j += 1
+
+    return [count]
+
+
 def _measure_blank_lines_python(files: list[Path]) -> dict:
     """Use ast module for Python blank line analysis."""
     between_top_level: list[int] = []
-    between_methods: list[int] = []
-    after_class_decl: list[int] = []
-    after_imports: list[int] = []
+    between_methods:   list[int] = []
+    after_class_decl:  list[int] = []
+    after_imports:     list[int] = []
 
     for fp in files:
         try:
@@ -174,74 +276,29 @@ def _measure_blank_lines_python(files: list[Path]) -> dict:
         except Exception:
             continue
 
-        # Top-level definitions
-        top_nodes = [
-            n for n in ast.walk(tree)
-            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
-            and n.col_offset == 0
-        ]
-        top_nodes.sort(key=lambda n: n.lineno)
+        between_top_level.extend(_blanks_between_top_level(tree, lines))
 
-        for node in top_nodes:
-            blanks = _count_blanks_before_line(lines, node.lineno - 1)
-            if node.lineno > 1:
-                between_top_level.append(blanks)
+        methods, decls = _blanks_between_methods(tree, lines)
+        between_methods.extend(methods)
+        after_class_decl.extend(decls)
 
-        # Methods inside classes
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ClassDef):
-                methods = [
-                    n for n in node.body
-                    if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
-                ]
-                # After class declaration line
-                if methods:
-                    first_method = methods[0]
-                    blanks = _count_blanks_before_line(lines, first_method.lineno - 1)
-                    after_class_decl.append(blanks)
-
-                for m in methods[1:]:
-                    blanks = _count_blanks_before_line(lines, m.lineno - 1)
-                    between_methods.append(blanks)
-
-        # After last import
-        import_lines = [
-            n.lineno for n in ast.walk(tree)
-            if isinstance(n, (ast.Import, ast.ImportFrom))
-        ]
-        if import_lines:
-            last_import = max(import_lines)
-            if last_import < len(lines):
-                count = 0
-                j = last_import  # 1-indexed → 0-indexed = last_import
-                while j < len(lines) and not lines[j].strip():
-                    count += 1
-                    j += 1
-                after_imports.append(count)
-
-    def _dist_summary(data: list[int]) -> dict:
-        if not data:
-            return {}
-        cnt = Counter(data)
-        mode = cnt.most_common(1)[0][0]
-        distribution = {str(k): v for k, v in sorted(cnt.items())}
-        return {"mode": mode, "distribution": distribution}
+        after_imports.extend(_blanks_after_imports(tree, lines))
 
     return {
-        "between_top_level_defs": _dist_summary(between_top_level),
-        "between_methods": _dist_summary(between_methods),
-        "after_class_declaration": _dist_summary(after_class_decl),
-        "after_imports": _dist_summary(after_imports),
+        "between_top_level_defs":   _dist_summary(between_top_level),
+        "between_methods":          _dist_summary(between_methods),
+        "after_class_declaration":  _dist_summary(after_class_decl),
+        "after_imports":            _dist_summary(after_imports),
     }
 
 
 def _measure_blank_lines_generic(files: list[Path], lang: str) -> dict:
     """Regex-based blank line analysis for non-Python languages."""
-    pattern = TOP_LEVEL_DEF_RE.get(lang)
+    pattern        = TOP_LEVEL_DEF_RE.get(lang)
     method_pattern = METHOD_DEF_RE.get(lang)
 
     between_top_level: list[int] = []
-    between_methods: list[int] = []
+    between_methods:   list[int] = []
 
     for fp in files:
         try:
@@ -259,13 +316,6 @@ def _measure_blank_lines_generic(files: list[Path], lang: str) -> dict:
                 if method_pattern.match(line) and i > 0:
                     between_methods.append(_count_blanks_before_line(lines, i))
 
-    def _dist_summary(data: list[int]) -> dict:
-        if not data:
-            return {}
-        cnt = Counter(data)
-        mode = cnt.most_common(1)[0][0]
-        return {"mode": mode, "distribution": {str(k): v for k, v in sorted(cnt.items())}}
-
     result: dict = {}
     if between_top_level:
         result["between_top_level_defs"] = _dist_summary(between_top_level)
@@ -274,86 +324,94 @@ def _measure_blank_lines_generic(files: list[Path], lang: str) -> dict:
     return result
 
 
+# ---------------------------------------------------------------------------
+# Per-file metrics accumulation
+# ---------------------------------------------------------------------------
+
+def _file_metrics(fp: Path) -> dict | None:
+    """Return raw per-file measurements, or None if the file can't be read."""
+    try:
+        content = fp.read_text(errors="ignore")
+    except Exception:
+        return None
+
+    raw_lines = content.split("\n")
+    lines = raw_lines[:-1] if content.endswith("\n") else raw_lines
+
+    indent      = _measure_indentation(lines)
+    has_tabs    = any(l.startswith("\t") for l in lines if l.strip())
+    has_spaces  = any(l.startswith(" ")  for l in lines if l.strip())
+    line_lengths = [len(l.rstrip("\n\r")) for l in lines if l.strip()]
+    trailing_newline = content.endswith("\n")
+    has_trailing_ws  = any(re.search(r"\s+$", l) for l in lines if l.strip())
+
+    return {
+        "indent":          indent,
+        "has_tabs":        has_tabs,
+        "has_spaces":      has_spaces,
+        "line_lengths":    line_lengths,
+        "trailing_newline": trailing_newline,
+        "has_trailing_ws": has_trailing_ws,
+        "path":            str(fp),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Language-level aggregation
+# ---------------------------------------------------------------------------
+
 def _measure_lang(lang: str, files: list[Path]) -> dict:
     all_line_lengths: list[int] = []
-    indent_votes: list[dict] = []
+    indent_votes:     list[dict] = []
+    tab_files:        list[str] = []
+    mixed_files:      list[str] = []
     trailing_newline_present = 0
-    trailing_newline_absent = 0
-    files_with_trailing_ws = 0
-    tab_files: list[str] = []
-    mixed_files: list[str] = []
+    trailing_newline_absent  = 0
+    files_with_trailing_ws   = 0
 
     for fp in files:
-        try:
-            content = fp.read_text(errors="ignore")
-        except Exception:
+        m = _file_metrics(fp)
+        if m is None:
             continue
 
-        raw_lines = content.split("\n")
-        # Drop the last empty element from a trailing newline
-        lines_for_indent = raw_lines[:-1] if content.endswith("\n") else raw_lines
+        indent_votes.append(m["indent"])
+        all_line_lengths.extend(m["line_lengths"])
 
-        # Indentation
-        indent = _measure_indentation(lines_for_indent)
-        indent_votes.append(indent)
-
-        has_tabs = any(l.startswith("\t") for l in lines_for_indent if l.strip())
-        has_spaces = any(l.startswith(" ") for l in lines_for_indent if l.strip())
-        if has_tabs and has_spaces:
-            mixed_files.append(str(fp))
-        elif has_tabs:
-            tab_files.append(str(fp))
-
-        # Line lengths (non-blank lines only)
-        for line in lines_for_indent:
-            stripped = line.rstrip("\n\r")
-            if stripped.strip():
-                all_line_lengths.append(len(stripped))
-
-        # Trailing newline
-        if content.endswith("\n"):
+        if m["trailing_newline"]:
             trailing_newline_present += 1
         else:
             trailing_newline_absent += 1
 
-        # Trailing whitespace
-        if any(re.search(r"\s+$", line) for line in lines_for_indent if line.strip()):
+        if m["has_trailing_ws"]:
             files_with_trailing_ws += 1
 
-    # Consensus indentation
-    units = Counter(v["unit"] for v in indent_votes if v["unit"] != "unknown")
-    sizes = Counter(v["size"] for v in indent_votes if v["unit"] != "unknown" and v["size"] > 0)
-    consensus_unit = units.most_common(1)[0][0] if units else "spaces"
-    consensus_size = sizes.most_common(1)[0][0] if sizes else 4
+        if m["has_tabs"] and m["has_spaces"]:
+            mixed_files.append(m["path"])
+        elif m["has_tabs"]:
+            tab_files.append(m["path"])
 
-    indentation = {
-        "unit": consensus_unit,
-        "size": consensus_size,
-        "tab_files": tab_files[:10],
-        "mixed_files": mixed_files[:10],
-    }
-
-    line_length = _measure_line_lengths(all_line_lengths)
-
-    # Blank lines
     if lang == "python":
         blank_lines = _measure_blank_lines_python(files)
     else:
         blank_lines = _measure_blank_lines_generic(files, lang)
 
     return {
-        "indentation": indentation,
-        "line_length": line_length,
-        "blank_lines": blank_lines,
+        "indentation":  _consensus_indentation(indent_votes, tab_files, mixed_files),
+        "line_length":  _measure_line_lengths(all_line_lengths),
+        "blank_lines":  blank_lines,
         "trailing_newline": {
             "present": trailing_newline_present,
-            "absent": trailing_newline_absent,
+            "absent":  trailing_newline_absent,
         },
         "trailing_whitespace": {
             "files_with_trailing_ws": files_with_trailing_ws,
         },
     }
 
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
 
 def measure(repo_path: str, lang_filter: str | None = None) -> dict:
     repo = Path(repo_path).resolve()

@@ -127,7 +127,6 @@ def scan(repo_path: str, lang_filter: str | None = None) -> dict:
                 "depth": file_depth,
             })
 
-    # Summary
     by_language: dict[str, dict] = {}
     for entry in tree:
         lang = entry["language"]
@@ -146,7 +145,6 @@ def scan(repo_path: str, lang_filter: str | None = None) -> dict:
         "avg_depth": avg_depth,
     }
 
-    # Read order: entry points first, then by line count descending per language
     entry_points = [e for e in tree if _is_entry_point(Path(e["path"]).stem)]
     rest = [e for e in tree if not _is_entry_point(Path(e["path"]).stem)]
 

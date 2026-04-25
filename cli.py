@@ -23,7 +23,6 @@ import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-# Add scripts/ directory to path so scripts can be imported as modules
 _HERE = Path(__file__).parent
 sys.path.insert(0, str(_HERE / "scripts"))
 
@@ -105,44 +104,35 @@ def main(argv: list[str] | None = None) -> int:
 
     sub = parser.add_subparsers(dest="command", required=True)
 
-    # analyze
     p_analyze = sub.add_parser("analyze", help="Run all scripts and merge output")
     p_analyze.add_argument("repos", nargs="+", metavar="repo", help="Path(s) to repository")
     p_analyze.add_argument("--lang", help="Filter to a single language where applicable")
 
-    # scan
     p_scan = sub.add_parser("scan", help="Directory tree + file inventory")
     p_scan.add_argument("repo", help="Path to repository")
     p_scan.add_argument("--lang", help="Filter to a single language")
 
-    # measure
     p_measure = sub.add_parser("measure", help="Exact formatting metrics")
     p_measure.add_argument("repo", help="Path to repository")
     p_measure.add_argument("--lang", help="Filter to a single language")
 
-    # config
     p_config = sub.add_parser("config", help="Formatter/linter detection and config")
     p_config.add_argument("repo", help="Path to repository")
 
-    # git
     p_git = sub.add_parser("git", help="Commit log and branch analysis")
     p_git.add_argument("repo", help="Path to repository")
 
-    # graph
     p_graph = sub.add_parser("graph", help="Internal import graph")
     p_graph.add_argument("repo", help="Path to repository")
     p_graph.add_argument("--lang", help="Filter to a single language")
 
-    # symbols
     p_symbols = sub.add_parser("symbols", help="Symbol name extraction and pattern clustering")
     p_symbols.add_argument("repo", help="Path to repository")
     p_symbols.add_argument("--lang", help="Filter to a single language")
 
-    # tests
     p_tests = sub.add_parser("tests", help="Test-to-source mapping and framework detection")
     p_tests.add_argument("repo", help="Path to repository")
 
-    # Propagate global flags to subparsers
     for p in [p_scan, p_measure, p_config, p_git, p_graph, p_symbols, p_tests, p_analyze]:
         p.add_argument("--pretty", action="store_true", help="Pretty-print JSON output")
         p.add_argument("--out", metavar="FILE", help="Write output to file")

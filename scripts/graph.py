@@ -16,18 +16,19 @@ import re
 import sys
 from pathlib import Path
 
-SKIP_DIRS: set[str] = {
-    "node_modules", "__pycache__", "dist", "build", "out",
-    "target", "vendor", "third_party", ".eggs", "site-packages",
-    "venv", ".venv", ".tox", ".nox",
-    ".pytest_cache", ".mypy_cache", ".ruff_cache",
-    "htmlcov",
-}
+from _common import SKIP_DIRS, should_skip_dir
+
+MAX_EDGES = 200
+MAX_CYCLES = 20
+MAX_MOST_DEPENDED = 10
+MIN_MONOREPO_SERVICES = 2
+
+MONOREPO_BOUNDARY_DIRS = ["services", "packages", "apps", "modules"]
 
 
-def _should_skip_dir(name: str) -> bool:
-    return name in SKIP_DIRS or name.startswith(".")
-
+# ---------------------------------------------------------------------------
+# File collection
+# ---------------------------------------------------------------------------
 
 def _collect_files(repo: Path, lang: str) -> list[Path]:
     ext_map = {
@@ -38,18 +39,24 @@ def _collect_files(repo: Path, lang: str) -> list[Path]:
     }
     exts = set(ext_map.get(lang, []))
     found = []
+
     for dirpath, dirs, files in os.walk(repo):
-        dirs[:] = [d for d in dirs if not _should_skip_dir(d)]
+        dirs[:] = [d for d in dirs if not should_skip_dir(d)]
         for fn in files:
             if Path(fn).suffix.lower() in exts:
                 found.append(Path(dirpath) / fn)
+
     return found
 
+
+# ---------------------------------------------------------------------------
+# Module name helpers
+# ---------------------------------------------------------------------------
 
 def _path_to_module(path: Path, repo: Path) -> str:
     rel = path.relative_to(repo)
     parts = list(rel.parts)
-    if parts[-1] in ("__init__.py",):
+    if parts[-1] == "__init__.py":
         parts = parts[:-1]
     else:
         parts[-1] = Path(parts[-1]).stem
@@ -67,6 +74,42 @@ def _file_for_module(module: str, repo: Path) -> Path | None:
             return c
     return None
 
+
+# ---------------------------------------------------------------------------
+# Import resolution (Python)
+# ---------------------------------------------------------------------------
+
+def _resolve_absolute_import(target: str, module_set: set[str]) -> str | None:
+    """Return the internal module name for a bare `import X` statement, or None."""
+    if target in module_set:
+        return target
+    prefix_match = next((m for m in module_set if target.startswith(m + ".")), None)
+    if prefix_match:
+        return prefix_match
+    return None
+
+
+def _resolve_relative_import(node: ast.ImportFrom, mod: str, module_set: set[str]) -> str | None:
+    """Return the internal module name for a `from . import X` statement, or None."""
+    if node.module is None:
+        return None
+
+    if node.level and node.level > 0:
+        parts = mod.split(".")
+        base_parts = parts[:max(0, len(parts) - node.level)]
+        resolved = ".".join(base_parts + [node.module]) if node.module else ".".join(base_parts)
+    else:
+        resolved = node.module
+
+    if resolved in module_set or any(resolved.startswith(m) for m in module_set):
+        return resolved
+
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Graph builders
+# ---------------------------------------------------------------------------
 
 def _build_python_graph(files: list[Path], repo: Path) -> dict:
     modules = {_path_to_module(f, repo): f for f in files}
@@ -86,63 +129,23 @@ def _build_python_graph(files: list[Path], repo: Path) -> dict:
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for alias in node.names:
-                    target = alias.name
-                    if target in module_set or any(target.startswith(m + ".") for m in module_set):
-                        # Normalize to existing module
-                        resolved = target if target in module_set else next(
-                            (m for m in module_set if target.startswith(m)), target
-                        )
+                    resolved = _resolve_absolute_import(alias.name, module_set)
+                    if resolved:
                         edges.append({"from": mod, "to": resolved, "line": node.lineno})
                         adjacency[mod].append(resolved)
 
             elif isinstance(node, ast.ImportFrom):
-                if node.module is None:
-                    continue
-                # Resolve relative imports
-                if node.level and node.level > 0:
-                    parts = mod.split(".")
-                    base_parts = parts[:max(0, len(parts) - node.level)]
-                    if node.module:
-                        resolved = ".".join(base_parts + [node.module])
-                    else:
-                        resolved = ".".join(base_parts)
-                else:
-                    resolved = node.module
-
-                # Check if internal
-                if resolved in module_set or any(
-                    resolved.startswith(m) for m in module_set
-                ):
+                resolved = _resolve_relative_import(node, mod, module_set)
+                if resolved:
                     edges.append({"from": mod, "to": resolved, "line": node.lineno})
                     if resolved in adjacency:
                         adjacency[mod].append(resolved)
 
-    # Circular dependency detection
-    cycles = _find_cycles(adjacency)
-
-    # Most depended on
-    dep_counts: dict[str, int] = {}
-    for deps in adjacency.values():
-        for d in deps:
-            dep_counts[d] = dep_counts.get(d, 0) + 1
-
-    most_depended = sorted(
-        [{"module": m, "dependents": c} for m, c in dep_counts.items()],
-        key=lambda x: -x["dependents"],
-    )[:10]
-
-    return {
-        "modules": sorted(module_set),
-        "edges": edges[:200],  # cap for large repos
-        "boundary_violations": [],
-        "circular_dependencies": cycles[:20],
-        "most_depended_on": most_depended,
-        "parse_errors": parse_errors,
-    }
+    return _graph_result(sorted(module_set), edges, adjacency, parse_errors)
 
 
 def _build_ts_graph(files: list[Path], repo: Path) -> dict:
-    import_re = re.compile(r"""(?:import|from)\s+['"]([^'"]+)['"]""")
+    import_re  = re.compile(r"""(?:import|from)\s+['"]([^'"]+)['"]""")
     require_re = re.compile(r"""require\(\s*['"]([^'"]+)['"]\s*\)""")
 
     edges: list[dict] = []
@@ -154,6 +157,7 @@ def _build_ts_graph(files: list[Path], repo: Path) -> dict:
     for fpath in files:
         rel = str(fpath.relative_to(repo).with_suffix(""))
         adjacency.setdefault(rel, [])
+
         try:
             source = fpath.read_text(errors="ignore")
         except Exception:
@@ -166,46 +170,42 @@ def _build_ts_graph(files: list[Path], repo: Path) -> dict:
                     target = m.group(1)
                     if not target.startswith("."):
                         continue
-                    # Resolve relative
-                    base = fpath.parent
-                    resolved = (base / target).resolve()
+
+                    resolved = (fpath.parent / target).resolve()
                     try:
                         rel_resolved = str(resolved.relative_to(repo))
                     except ValueError:
                         continue
-                    # Strip extension
+
                     rel_resolved = re.sub(r"\.(ts|tsx|js|jsx|mjs)$", "", rel_resolved)
                     if rel_resolved in file_stems:
                         edges.append({"from": rel, "to": rel_resolved, "line": lineno})
                         adjacency[rel].append(rel_resolved)
 
-    cycles = _find_cycles(adjacency)
-    dep_counts: dict[str, int] = {}
-    for deps in adjacency.values():
-        for d in deps:
-            dep_counts[d] = dep_counts.get(d, 0) + 1
-
-    most_depended = sorted(
-        [{"module": m, "dependents": c} for m, c in dep_counts.items()],
-        key=lambda x: -x["dependents"],
-    )[:10]
-
-    return {
-        "modules": sorted(adjacency.keys()),
-        "edges": edges[:200],
-        "boundary_violations": [],
-        "circular_dependencies": cycles[:20],
-        "most_depended_on": most_depended,
-        "parse_errors": parse_errors,
-    }
+    return _graph_result(sorted(adjacency.keys()), edges, adjacency, parse_errors)
 
 
-def _build_go_graph(files: list[Path], repo: Path) -> dict:
+def _extract_go_imports(source: str) -> list[str]:
+    """Return all import paths found in a Go source file."""
     import_block_re = re.compile(r'import\s*\(([^)]+)\)', re.DOTALL)
     single_import_re = re.compile(r'^import\s+"([^"]+)"')
     quoted_re = re.compile(r'"([^"]+)"')
 
-    # Read module path from go.mod
+    imports: list[str] = []
+
+    for m in import_block_re.finditer(source):
+        for im in quoted_re.findall(m.group(1)):
+            imports.append(im)
+
+    for line in source.splitlines():
+        m = single_import_re.match(line.strip())
+        if m:
+            imports.append(m.group(1))
+
+    return imports
+
+
+def _build_go_graph(files: list[Path], repo: Path) -> dict:
     module_prefix = ""
     gomod = repo / "go.mod"
     if gomod.exists():
@@ -229,41 +229,29 @@ def _build_go_graph(files: list[Path], repo: Path) -> dict:
             parse_errors.append(rel)
             continue
 
-        imports: list[str] = []
-        for m in import_block_re.finditer(source):
-            for im in quoted_re.findall(m.group(1)):
-                imports.append(im)
-        for lineno, line in enumerate(source.splitlines(), 1):
-            m2 = single_import_re.match(line.strip())
-            if m2:
-                imports.append(m2.group(1))
-
-        for imp in imports:
+        for imp in _extract_go_imports(source):
             if module_prefix and imp.startswith(module_prefix):
-                # Internal import
                 internal_path = imp[len(module_prefix):].lstrip("/")
                 edges.append({"from": pkg, "to": internal_path, "line": 0})
                 adjacency[pkg].append(internal_path)
 
-    cycles = _find_cycles(adjacency)
+    return _graph_result(sorted(adjacency.keys()), edges, adjacency, parse_errors)
+
+
+# ---------------------------------------------------------------------------
+# Graph analysis
+# ---------------------------------------------------------------------------
+
+def _compute_most_depended(adjacency: dict[str, list[str]]) -> list[dict]:
     dep_counts: dict[str, int] = {}
     for deps in adjacency.values():
         for d in deps:
             dep_counts[d] = dep_counts.get(d, 0) + 1
 
-    most_depended = sorted(
+    return sorted(
         [{"module": m, "dependents": c} for m, c in dep_counts.items()],
         key=lambda x: -x["dependents"],
-    )[:10]
-
-    return {
-        "modules": sorted(adjacency.keys()),
-        "edges": edges[:200],
-        "boundary_violations": [],
-        "circular_dependencies": cycles[:20],
-        "most_depended_on": most_depended,
-        "parse_errors": parse_errors,
-    }
+    )[:MAX_MOST_DEPENDED]
 
 
 def _find_cycles(adjacency: dict[str, list[str]]) -> list[list[str]]:
@@ -282,7 +270,6 @@ def _find_cycles(adjacency: dict[str, list[str]]) -> list[list[str]]:
             if neighbor not in visited:
                 dfs(neighbor)
             elif neighbor in rec_stack:
-                # Found cycle
                 cycle_start = path.index(neighbor)
                 cycles.append(path[cycle_start:] + [neighbor])
 
@@ -296,24 +283,46 @@ def _find_cycles(adjacency: dict[str, list[str]]) -> list[list[str]]:
     return cycles
 
 
+def _graph_result(
+    modules: list[str],
+    edges: list[dict],
+    adjacency: dict[str, list[str]],
+    parse_errors: list[str],
+) -> dict:
+    return {
+        "modules": sorted(modules),
+        "edges": edges[:MAX_EDGES],
+        "boundary_violations": [],
+        "circular_dependencies": _find_cycles(adjacency)[:MAX_CYCLES],
+        "most_depended_on": _compute_most_depended(adjacency),
+        "parse_errors": parse_errors,
+    }
+
+
 def _detect_monorepo_boundaries(repo: Path) -> dict:
-    boundary_dirs = ["services", "packages", "apps", "modules"]
-    for bd in boundary_dirs:
+    for bd in MONOREPO_BOUNDARY_DIRS:
         bd_path = repo / bd
-        if bd_path.is_dir():
-            services = [
-                d.name for d in bd_path.iterdir()
-                if d.is_dir() and not d.name.startswith(".")
-            ]
-            if len(services) >= 2:
-                return {
-                    "detected": True,
-                    "boundary_dir": bd,
-                    "services": services,
-                    "cross_service_imports": [],  # populated per-language if needed
-                }
+        if not bd_path.is_dir():
+            continue
+
+        services = [
+            d.name for d in bd_path.iterdir()
+            if d.is_dir() and not d.name.startswith(".")
+        ]
+        if len(services) >= MIN_MONOREPO_SERVICES:
+            return {
+                "detected": True,
+                "boundary_dir": bd,
+                "services": services,
+                "cross_service_imports": [],
+            }
+
     return {"detected": False, "services": [], "cross_service_imports": []}
 
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
 
 def build_graph(repo_path: str, lang_filter: str | None = None) -> dict:
     repo = Path(repo_path).resolve()
@@ -321,10 +330,9 @@ def build_graph(repo_path: str, lang_filter: str | None = None) -> dict:
         return {"error": f"path does not exist: {repo_path}", "script": "graph"}
 
     result: dict = {}
+    langs = [lang_filter] if lang_filter else ["python", "typescript", "javascript", "go"]
 
-    langs_to_check = [lang_filter] if lang_filter else ["python", "typescript", "javascript", "go"]
-
-    for lang in langs_to_check:
+    for lang in langs:
         files = _collect_files(repo, lang)
         if not files:
             continue

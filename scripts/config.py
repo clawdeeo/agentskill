@@ -16,12 +16,23 @@ import re
 import sys
 from pathlib import Path
 
+MAX_CONFIG_READ_BYTES = 32_000
+
+PRETTIER_CONFIG_FILES = [
+    ".prettierrc", ".prettierrc.json", ".prettierrc.js",
+    ".prettierrc.cjs", ".prettierrc.yml", ".prettierrc.yaml",
+    ".prettierrc.toml",
+]
+
+ESLINT_CONFIG_FILES = [
+    ".eslintrc.json", ".eslintrc.js", ".eslintrc.cjs",
+    ".eslintrc.yml", ".eslintrc.yaml", ".eslintrc",
+    "eslint.config.js", "eslint.config.mjs", "eslint.config.cjs",
+]
+
 
 # ---------------------------------------------------------------------------
-# Minimal TOML parser — covers the subset used by formatter/linter configs.
-# Handles: [sections], key = value, key = "string", key = 123, key = true,
-#          key = ["a", "b"], multi-line arrays, inline tables {k = v}.
-# Does NOT handle: dotted keys, multi-line strings, datetime, hex/octal.
+# Low-level parsers
 # ---------------------------------------------------------------------------
 
 def _parse_toml_value(s: str):
@@ -78,12 +89,10 @@ def _parse_toml(content: str) -> dict:
         line = lines[i]
         stripped = line.strip()
 
-        # Skip comments and blanks
         if not stripped or stripped.startswith("#"):
             i += 1
             continue
 
-        # Section header [a.b.c] or [[array]]
         if stripped.startswith("[["):
             m = re.match(r"^\[\[([^\]]+)\]\]", stripped)
             if m:
@@ -98,13 +107,11 @@ def _parse_toml(content: str) -> dict:
             i += 1
             continue
 
-        # Key = value
         if "=" in stripped and not stripped.startswith("#"):
             key, _, rest = stripped.partition("=")
             key = key.strip()
             rest = rest.strip()
 
-            # Multi-line array
             if rest.startswith("[") and "]" not in rest:
                 parts = [rest]
                 i += 1
@@ -135,13 +142,6 @@ def _get_nested(d: dict, *keys: str):
     return d
 
 
-# ---------------------------------------------------------------------------
-# Minimal YAML scalar parser for simple flat/nested configs
-# (.golangci.yml, .prettierrc.yml, etc.)
-# Handles: scalars, sequences (- item), mappings (key: value)
-# Does NOT handle: anchors, aliases, multi-document, block scalars
-# ---------------------------------------------------------------------------
-
 def _parse_yaml_simple(content: str) -> dict:
     result: dict = {}
     stack: list[tuple[int, dict | list]] = [(-1, result)]
@@ -154,7 +154,6 @@ def _parse_yaml_simple(content: str) -> dict:
         indent = len(line) - len(line.lstrip())
         stripped = line.strip()
 
-        # Pop stack to current indent level
         while len(stack) > 1 and stack[-1][0] >= indent:
             stack.pop()
             list_key_stack.pop()
@@ -181,9 +180,6 @@ def _parse_yaml_simple(content: str) -> dict:
                     parent[key] = child
                     stack.append((indent, child))
                     list_key_stack.append(key)
-                    # Pre-create list for sequences
-        elif stripped.startswith("- "):
-            pass
 
     return result
 
@@ -205,11 +201,18 @@ def _yaml_scalar(s: str):
     return s
 
 
-# ---------------------------------------------------------------------------
-# Config file discovery and parsing
-# ---------------------------------------------------------------------------
+def _parse_by_extension(raw: str, fname: str) -> dict:
+    """Parse raw config file content based on file extension."""
+    if fname.endswith(".json") or fname in (".prettierrc", ".eslintrc"):
+        return _parse_json_safe(raw) if raw.strip().startswith("{") else {}
+    if fname.endswith((".yml", ".yaml")):
+        return _parse_yaml_simple(raw)
+    if fname.endswith(".toml"):
+        return _parse_toml(raw)
+    return {}
 
-def _read(path: Path, max_bytes: int = 32_000) -> str:
+
+def _read(path: Path, max_bytes: int = MAX_CONFIG_READ_BYTES) -> str:
     try:
         return path.read_text(errors="ignore")[:max_bytes]
     except Exception:
@@ -221,6 +224,27 @@ def _parse_json_safe(content: str) -> dict:
         return json.loads(content)
     except Exception:
         return {}
+
+
+def _parse_ini_section(content: str, header: str) -> dict:
+    pattern = re.compile(
+        r"^" + re.escape(header) + r"(.*?)(?=^\[|\Z)",
+        re.MULTILINE | re.DOTALL,
+    )
+    m = pattern.search(content)
+    if not m:
+        return {}
+
+    result = {}
+    for line in m.group(1).splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or line.startswith(";"):
+            continue
+        if "=" in line:
+            k, _, v = line.partition("=")
+            result[k.strip()] = v.strip()
+
+    return result
 
 
 def _parse_editorconfig(path: Path) -> dict:
@@ -248,142 +272,137 @@ def _parse_editorconfig(path: Path) -> dict:
     return sections
 
 
-def _settings_from_pyproject(tool_path: list[str], toml_data: dict) -> dict:
-    node = toml_data
-    for key in tool_path:
-        if not isinstance(node, dict):
-            return {}
-        node = node.get(key, {})
-    return node if isinstance(node, dict) else {}
+def _parse_editorconfig_for_lang(sections: dict, lang: str) -> dict:
+    """Extract editorconfig rules relevant to a language."""
+    lang_ext_map = {
+        "python":     ["*.py"],
+        "typescript": ["*.ts", "*.tsx"],
+        "javascript": ["*.js", "*.jsx", "*.mjs"],
+        "go":         ["*.go"],
+        "rust":       ["*.rs"],
+        "ruby":       ["*.rb"],
+    }
+    exts = lang_ext_map.get(lang, [])
+    result = dict(sections.get("[*]", {}))
+    for ext in exts:
+        result.update(sections.get(f"[{ext}]", {}))
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Python tool detection (formatter / linter / type checker)
+# ---------------------------------------------------------------------------
+
+def _detect_python_formatter(repo: Path, toml_data: dict) -> dict | None:
+    ruff_format = _get_nested(toml_data, "tool", "ruff", "format")
+    ruff_top    = _get_nested(toml_data, "tool", "ruff") or {}
+    black_cfg   = _get_nested(toml_data, "tool", "black")
+    ruff_toml   = repo / "ruff.toml"
+
+    if ruff_format or ruff_toml.exists():
+        settings = dict(ruff_format) if isinstance(ruff_format, dict) else {}
+        for key in ("line-length", "indent-width"):
+            if key in ruff_top:
+                settings.setdefault(key, ruff_top[key])
+        if ruff_toml.exists():
+            extra = _parse_toml(_read(ruff_toml))
+            settings.update(extra.get("format", {}))
+            if "line-length" in extra:
+                settings.setdefault("line-length", extra["line-length"])
+        return {"name": "ruff", "config_file": "pyproject.toml", "settings": settings}
+
+    if black_cfg or (repo / ".black").exists():
+        settings = dict(black_cfg) if isinstance(black_cfg, dict) else {}
+        return {"name": "black", "config_file": "pyproject.toml", "settings": settings}
+
+    black_toml = repo / "black.toml"
+    if black_toml.exists():
+        return {"name": "black", "config_file": "black.toml",
+                "settings": _parse_toml(_read(black_toml))}
+
+    return None
+
+
+def _detect_python_linter(repo: Path, toml_data: dict) -> dict | None:
+    ruff_lint    = _get_nested(toml_data, "tool", "ruff", "lint")
+    ruff_top_cfg = _get_nested(toml_data, "tool", "ruff") or {}
+    flake8_cfg   = repo / ".flake8"
+    setup_cfg    = repo / "setup.cfg"
+
+    if ruff_lint or ruff_top_cfg:
+        settings = dict(ruff_lint) if isinstance(ruff_lint, dict) else {}
+        for k in ("select", "ignore", "extend-select", "extend-ignore", "per-file-ignores"):
+            if k in ruff_top_cfg and k not in settings:
+                settings[k] = ruff_top_cfg[k]
+        return {"name": "ruff", "config_file": "pyproject.toml", "settings": settings}
+
+    if flake8_cfg.exists():
+        return {"name": "flake8", "config_file": ".flake8",
+                "settings": _parse_ini_section(_read(flake8_cfg), "[flake8]")}
+
+    if setup_cfg.exists():
+        parsed = _parse_ini_section(_read(setup_cfg), "[flake8]")
+        if parsed:
+            return {"name": "flake8", "config_file": "setup.cfg", "settings": parsed}
+
+    return None
+
+
+def _detect_python_type_checker(repo: Path, toml_data: dict) -> dict | None:
+    mypy_cfg     = _get_nested(toml_data, "tool", "mypy")
+    mypy_ini     = repo / "mypy.ini"
+    mypy_ini2    = repo / ".mypy.ini"
+    pyright_json = repo / "pyrightconfig.json"
+
+    if mypy_cfg:
+        return {"name": "mypy", "config_file": "pyproject.toml", "settings": dict(mypy_cfg)}
+
+    if mypy_ini.exists():
+        return {"name": "mypy", "config_file": "mypy.ini",
+                "settings": _parse_ini_section(_read(mypy_ini), "[mypy]")}
+
+    if mypy_ini2.exists():
+        return {"name": "mypy", "config_file": ".mypy.ini",
+                "settings": _parse_ini_section(_read(mypy_ini2), "[mypy]")}
+
+    if pyright_json.exists():
+        return {"name": "pyright", "config_file": "pyrightconfig.json",
+                "settings": _parse_json_safe(_read(pyright_json))}
+
+    return None
 
 
 def _detect_python(repo: Path, toml_data: dict) -> dict:
     result: dict = {}
 
-    # --- Formatter ---
-    # Priority: ruff.format > black
-    ruff_format = _get_nested(toml_data, "tool", "ruff", "format")
-    black_cfg = _get_nested(toml_data, "tool", "black")
-    ruff_toml_path = repo / "ruff.toml"
-    black_toml_path = repo / ".black"
+    formatter    = _detect_python_formatter(repo, toml_data)
+    linter       = _detect_python_linter(repo, toml_data)
+    type_checker = _detect_python_type_checker(repo, toml_data)
 
-    if ruff_format or ruff_toml_path.exists():
-        settings = dict(ruff_format) if isinstance(ruff_format, dict) else {}
-        # Pull line-length from top-level ruff config too
-        ruff_top = _get_nested(toml_data, "tool", "ruff") or {}
-        if "line-length" in ruff_top:
-            settings.setdefault("line-length", ruff_top["line-length"])
-        if "indent-width" in ruff_top:
-            settings.setdefault("indent-width", ruff_top["indent-width"])
-        if ruff_toml_path.exists():
-            extra = _parse_toml(_read(ruff_toml_path))
-            settings.update(extra.get("format", {}))
-            if "line-length" in extra:
-                settings.setdefault("line-length", extra["line-length"])
-        result["formatter"] = {"name": "ruff", "config_file": "pyproject.toml", "settings": settings}
-    elif black_cfg or black_toml_path.exists():
-        settings = dict(black_cfg) if isinstance(black_cfg, dict) else {}
-        result["formatter"] = {"name": "black", "config_file": "pyproject.toml", "settings": settings}
-    else:
-        # Check standalone black.toml
-        for fname in ["black.toml"]:
-            fp = repo / fname
-            if fp.exists():
-                result["formatter"] = {"name": "black", "config_file": fname,
-                                       "settings": _parse_toml(_read(fp))}
-                break
-
-    # --- Linter ---
-    ruff_lint = _get_nested(toml_data, "tool", "ruff", "lint")
-    ruff_top2 = _get_nested(toml_data, "tool", "ruff") or {}
-    flake8_cfg = repo / ".flake8"
-    setup_cfg = repo / "setup.cfg"
-
-    if ruff_lint or _get_nested(toml_data, "tool", "ruff"):
-        settings = dict(ruff_lint) if isinstance(ruff_lint, dict) else {}
-        # Include top-level ruff select/ignore if present
-        for k in ("select", "ignore", "extend-select", "extend-ignore", "per-file-ignores"):
-            if k in ruff_top2 and k not in settings:
-                settings[k] = ruff_top2[k]
-        result["linter"] = {"name": "ruff", "config_file": "pyproject.toml", "settings": settings}
-    elif flake8_cfg.exists():
-        raw = _read(flake8_cfg)
-        parsed = _parse_ini_section(raw, "[flake8]")
-        result["linter"] = {"name": "flake8", "config_file": ".flake8", "settings": parsed}
-    elif setup_cfg.exists():
-        raw = _read(setup_cfg)
-        parsed = _parse_ini_section(raw, "[flake8]")
-        if parsed:
-            result["linter"] = {"name": "flake8", "config_file": "setup.cfg", "settings": parsed}
-
-    # --- Type checker ---
-    mypy_cfg = _get_nested(toml_data, "tool", "mypy")
-    mypy_ini = repo / "mypy.ini"
-    mypy_ini2 = repo / ".mypy.ini"
-    pyright_json = repo / "pyrightconfig.json"
-
-    if mypy_cfg:
-        result["type_checker"] = {"name": "mypy", "config_file": "pyproject.toml",
-                                   "settings": dict(mypy_cfg)}
-    elif mypy_ini.exists():
-        raw = _read(mypy_ini)
-        result["type_checker"] = {"name": "mypy", "config_file": "mypy.ini",
-                                   "settings": _parse_ini_section(raw, "[mypy]")}
-    elif mypy_ini2.exists():
-        raw = _read(mypy_ini2)
-        result["type_checker"] = {"name": "mypy", "config_file": ".mypy.ini",
-                                   "settings": _parse_ini_section(raw, "[mypy]")}
-    elif pyright_json.exists():
-        result["type_checker"] = {"name": "pyright", "config_file": "pyrightconfig.json",
-                                   "settings": _parse_json_safe(_read(pyright_json))}
+    if formatter:
+        result["formatter"] = formatter
+    if linter:
+        result["linter"] = linter
+    if type_checker:
+        result["type_checker"] = type_checker
 
     return result
 
 
-def _parse_ini_section(content: str, header: str) -> dict:
-    pattern = re.compile(
-        r"^" + re.escape(header) + r"(.*?)(?=^\[|\Z)",
-        re.MULTILINE | re.DOTALL,
-    )
-    m = pattern.search(content)
-    if not m:
-        return {}
-    result = {}
-    for line in m.group(1).splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or line.startswith(";"):
-            continue
-        if "=" in line:
-            k, _, v = line.partition("=")
-            result[k.strip()] = v.strip()
-    return result
-
+# ---------------------------------------------------------------------------
+# Other language detection
+# ---------------------------------------------------------------------------
 
 def _detect_typescript(repo: Path) -> dict:
     result: dict = {}
 
-    # --- Formatter: prettier ---
-    prettier_files = [
-        ".prettierrc", ".prettierrc.json", ".prettierrc.js",
-        ".prettierrc.cjs", ".prettierrc.yml", ".prettierrc.yaml",
-        ".prettierrc.toml",
-    ]
-    for fname in prettier_files:
+    for fname in PRETTIER_CONFIG_FILES:
         fp = repo / fname
         if fp.exists():
-            raw = _read(fp)
-            if fname.endswith(".json") or fname == ".prettierrc":
-                settings = _parse_json_safe(raw) if raw.strip().startswith("{") else {}
-            elif fname.endswith((".yml", ".yaml")):
-                settings = _parse_yaml_simple(raw)
-            elif fname.endswith(".toml"):
-                settings = _parse_toml(raw)
-            else:
-                settings = {}
-            result["formatter"] = {"name": "prettier", "config_file": fname, "settings": settings}
+            result["formatter"] = {"name": "prettier", "config_file": fname,
+                                   "settings": _parse_by_extension(_read(fp), fname)}
             break
 
-    # Also check package.json "prettier" key
     if "formatter" not in result:
         pkg = repo / "package.json"
         if pkg.exists():
@@ -392,31 +411,18 @@ def _detect_typescript(repo: Path) -> dict:
                 result["formatter"] = {"name": "prettier", "config_file": "package.json",
                                        "settings": data["prettier"]}
 
-    # --- Linter: eslint ---
-    eslint_files = [
-        ".eslintrc.json", ".eslintrc.js", ".eslintrc.cjs",
-        ".eslintrc.yml", ".eslintrc.yaml", ".eslintrc",
-        "eslint.config.js", "eslint.config.mjs", "eslint.config.cjs",
-    ]
-    for fname in eslint_files:
+    for fname in ESLINT_CONFIG_FILES:
         fp = repo / fname
         if fp.exists():
-            raw = _read(fp)
-            settings: dict = {}
-            if fname.endswith(".json") or fname == ".eslintrc":
-                settings = _parse_json_safe(raw) if raw.strip().startswith("{") else {}
-            elif fname.endswith((".yml", ".yaml")):
-                settings = _parse_yaml_simple(raw)
-            result["linter"] = {"name": "eslint", "config_file": fname, "settings": settings}
+            result["linter"] = {"name": "eslint", "config_file": fname,
+                                 "settings": _parse_by_extension(_read(fp), fname)}
             break
 
-    # --- Type checker: tsc ---
     tsconfig = repo / "tsconfig.json"
     if tsconfig.exists():
         data = _parse_json_safe(_read(tsconfig))
-        compiler_opts = data.get("compilerOptions", {})
         result["type_checker"] = {"name": "tsc", "config_file": "tsconfig.json",
-                                   "settings": compiler_opts}
+                                   "settings": data.get("compilerOptions", {})}
 
     return result
 
@@ -429,15 +435,8 @@ def _detect_go(repo: Path) -> dict:
     for fname in [".golangci.yml", ".golangci.yaml", ".golangci.toml", ".golangci.json"]:
         fp = repo / fname
         if fp.exists():
-            raw = _read(fp)
-            if fname.endswith(".json"):
-                settings = _parse_json_safe(raw)
-            elif fname.endswith((".yml", ".yaml")):
-                settings = _parse_yaml_simple(raw)
-            else:
-                settings = _parse_toml(raw)
             result["linter"] = {"name": "golangci-lint", "config_file": fname,
-                                 "settings": settings}
+                                 "settings": _parse_by_extension(_read(fp), fname)}
             break
 
     return result
@@ -461,78 +460,60 @@ def _detect_rust(repo: Path) -> dict:
     return result
 
 
-def _parse_editorconfig_for_lang(sections: dict, lang: str) -> dict:
-    """Extract editorconfig rules relevant to a language."""
-    lang_ext_map = {
-        "python": ["*.py"],
-        "typescript": ["*.ts", "*.tsx"],
-        "javascript": ["*.js", "*.jsx", "*.mjs"],
-        "go": ["*.go"],
-        "rust": ["*.rs"],
-        "ruby": ["*.rb"],
-    }
-    exts = lang_ext_map.get(lang, [])
-    result = dict(sections.get("[*]", {}))
-    for ext in exts:
-        key = f"[{ext}]"
-        result.update(sections.get(key, {}))
-    return result
+# ---------------------------------------------------------------------------
+# Editorconfig attachment
+# ---------------------------------------------------------------------------
 
+def _attach_editorconfig(lang_result: dict, ec_sections: dict, lang: str) -> None:
+    """Mutate lang_result in place: attach editorconfig entry if one exists."""
+    ec = _parse_editorconfig_for_lang(ec_sections, lang)
+    if ec:
+        lang_result["editorconfig"] = ec
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
 
 def detect(repo_path: str) -> dict:
     repo = Path(repo_path).resolve()
     if not repo.exists():
         return {"error": f"path does not exist: {repo_path}", "script": "config"}
 
-    # Load pyproject.toml once
     toml_data: dict = {}
     pyproject = repo / "pyproject.toml"
     if pyproject.exists():
         toml_data = _parse_toml(_read(pyproject))
 
-    # Load .editorconfig
-    editorconfig_sections: dict = {}
+    ec_sections: dict = {}
     ec = repo / ".editorconfig"
     if ec.exists():
-        editorconfig_sections = _parse_editorconfig(ec)
+        ec_sections = _parse_editorconfig(ec)
 
     result: dict = {}
 
-    # Python
     py = _detect_python(repo, toml_data)
     if py:
-        ec_py = _parse_editorconfig_for_lang(editorconfig_sections, "python")
-        if ec_py:
-            py["editorconfig"] = ec_py
+        _attach_editorconfig(py, ec_sections, "python")
         result["python"] = py
 
-    # TypeScript / JavaScript (share config files, reported under "typescript")
     ts = _detect_typescript(repo)
     if ts:
-        ec_ts = _parse_editorconfig_for_lang(editorconfig_sections, "typescript")
-        if ec_ts:
-            ts["editorconfig"] = ec_ts
+        _attach_editorconfig(ts, ec_sections, "typescript")
         result["typescript"] = ts
 
-    # Go
     go = _detect_go(repo)
     if (repo / "go.mod").exists() or list(repo.rglob("*.go")):
-        ec_go = _parse_editorconfig_for_lang(editorconfig_sections, "go")
-        if ec_go:
-            go["editorconfig"] = ec_go
+        _attach_editorconfig(go, ec_sections, "go")
         result["go"] = go
 
-    # Rust
     rust = _detect_rust(repo)
     if (repo / "Cargo.toml").exists() or list(repo.rglob("*.rs")):
-        ec_rs = _parse_editorconfig_for_lang(editorconfig_sections, "rust")
-        if ec_rs:
-            rust["editorconfig"] = ec_rs
+        _attach_editorconfig(rust, ec_sections, "rust")
         result["rust"] = rust
 
-    # Global editorconfig
-    if editorconfig_sections:
-        result["editorconfig"] = editorconfig_sections
+    if ec_sections:
+        result["editorconfig"] = ec_sections
 
     return result
 

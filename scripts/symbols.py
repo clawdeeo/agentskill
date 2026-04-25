@@ -18,28 +18,37 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-SKIP_DIRS: set[str] = {
-    "node_modules", "__pycache__", "dist", "build", "out",
-    "target", "vendor", "third_party", ".eggs", "site-packages",
-    "venv", ".venv", ".tox", ".nox",
-    ".pytest_cache", ".mypy_cache", ".ruff_cache",
-    "htmlcov",
+from _common import SKIP_DIRS, should_skip_dir
+
+MIN_NAME_LENGTH = 4
+MAX_AFFIX_LENGTH = 8
+MAX_AFFIX_EXAMPLES = 3
+MAX_AFFIX_CANDIDATES = 30
+MAX_AFFIXES_RETURNED = 10
+
+SKIP_AFFIXES = {
+    "er", "ed", "ing", "ion", "al", "tion", "le", "or", "is", "at",
+    "get", "set", "has", "is_", "_is", "on", "re", "un", "de",
 }
 
 
-def _should_skip_dir(name: str) -> bool:
-    return name in SKIP_DIRS or name.startswith(".")
-
+# ---------------------------------------------------------------------------
+# File collection
+# ---------------------------------------------------------------------------
 
 def _collect_files(repo: Path, exts: list[str]) -> list[Path]:
     found = []
     for dirpath, dirs, files in os.walk(repo):
-        dirs[:] = [d for d in dirs if not _should_skip_dir(d)]
+        dirs[:] = [d for d in dirs if not should_skip_dir(d)]
         for fn in files:
             if Path(fn).suffix.lower() in exts:
                 found.append(Path(dirpath) / fn)
     return found
 
+
+# ---------------------------------------------------------------------------
+# Name classification
+# ---------------------------------------------------------------------------
 
 def _classify(name: str) -> str:
     if name.startswith("__") and name.endswith("__"):
@@ -57,6 +66,83 @@ def _classify(name: str) -> str:
     return "other"
 
 
+# ---------------------------------------------------------------------------
+# Affix detection
+# ---------------------------------------------------------------------------
+
+def _collect_affix_counts(
+    names: list[str], kind: str, min_len: int
+) -> tuple[Counter, dict[str, list[str]]]:
+    """Count prefix or suffix occurrences across names. kind is 'prefix' or 'suffix'."""
+    counts: Counter = Counter()
+    examples: dict[str, list[str]] = {}
+
+    for name in names:
+        if len(name) < MIN_NAME_LENGTH or (name.startswith("__") and name.endswith("__")):
+            continue
+        clean = name.lstrip("_")
+
+        for length in range(min_len, min(MAX_AFFIX_LENGTH + 1, len(clean))):
+            affix = clean[:length] if kind == "prefix" else clean[-length:]
+            valid = (
+                affix.isalpha()
+                or ("_" in affix and (affix.endswith("_") if kind == "prefix" else affix.startswith("_")))
+            )
+            if valid:
+                counts[affix] += 1
+                examples.setdefault(affix, [])
+                if len(examples[affix]) < MAX_AFFIX_EXAMPLES:
+                    examples[affix].append(name)
+
+    return counts, examples
+
+
+def _affix_entries(
+    counts: Counter,
+    examples: dict[str, list[str]],
+    kind: str,
+    min_count: int,
+    min_len: int,
+) -> list[dict]:
+    """Build result dicts for the top affix candidates."""
+    entries = []
+    for affix, count in counts.most_common(MAX_AFFIX_CANDIDATES):
+        if count < min_count or affix.lower() in SKIP_AFFIXES or len(affix) < min_len:
+            continue
+        if kind == "prefix":
+            pattern = f"{affix}_ prefix" if not affix.endswith("_") else f"{affix} prefix"
+        else:
+            pattern = f"_{affix} suffix" if not affix.startswith("_") else f"{affix} suffix"
+        entries.append({"pattern": pattern, "count": count, "examples": examples.get(affix, [])})
+    return entries
+
+
+def _dedupe_sorted(results: list[dict]) -> list[dict]:
+    """Deduplicate by pattern key, return top MAX_AFFIXES_RETURNED sorted by count."""
+    seen: set[str] = set()
+    unique: list[dict] = []
+    for r in sorted(results, key=lambda x: -x["count"]):
+        if r["pattern"] not in seen:
+            seen.add(r["pattern"])
+            unique.append(r)
+        if len(unique) >= MAX_AFFIXES_RETURNED:
+            break
+    return unique
+
+
+def _find_affixes(names: list[str], min_count: int = 5, min_len: int = 2) -> list[dict]:
+    """Find recurring prefixes and suffixes appearing in 5+ names."""
+    prefix_counts, prefix_examples = _collect_affix_counts(names, "prefix", min_len)
+    suffix_counts, suffix_examples = _collect_affix_counts(names, "suffix", min_len)
+
+    results = (
+        _affix_entries(prefix_counts, prefix_examples, "prefix", min_count, min_len)
+        + _affix_entries(suffix_counts, suffix_examples, "suffix", min_count, min_len)
+    )
+
+    return _dedupe_sorted(results)
+
+
 def _pattern_summary(names: list[str]) -> dict:
     if not names:
         return {"total": 0, "patterns": {}, "codebase_specific": []}
@@ -68,80 +154,12 @@ def _pattern_summary(names: list[str]) -> dict:
         for k, v in sorted(counts.items(), key=lambda x: -x[1])
     }
 
-    # Codebase-specific affix detection
-    codebase_specific = _find_affixes(names)
-
-    return {"total": total, "patterns": patterns, "codebase_specific": codebase_specific}
+    return {"total": total, "patterns": patterns, "codebase_specific": _find_affixes(names)}
 
 
-def _find_affixes(names: list[str], min_count: int = 5, min_len: int = 2) -> list[dict]:
-    """Find recurring prefixes and suffixes appearing in 5+ names."""
-    prefix_counts: Counter = Counter()
-    suffix_counts: Counter = Counter()
-    prefix_examples: dict[str, list[str]] = {}
-    suffix_examples: dict[str, list[str]] = {}
-
-    for name in names:
-        # Skip very short names and dunders
-        if len(name) < 4 or (name.startswith("__") and name.endswith("__")):
-            continue
-        clean = name.lstrip("_")
-
-        # Prefixes of length 2–8
-        for length in range(min_len, min(9, len(clean))):
-            prefix = clean[:length]
-            if prefix.isalpha() or ("_" in prefix and prefix.endswith("_")):
-                prefix_counts[prefix] += 1
-                prefix_examples.setdefault(prefix, [])
-                if len(prefix_examples[prefix]) < 3:
-                    prefix_examples[prefix].append(name)
-
-        # Suffixes of length 2–8
-        for length in range(min_len, min(9, len(clean))):
-            suffix = clean[-length:]
-            if suffix.isalpha() or ("_" in suffix and suffix.startswith("_")):
-                suffix_counts[suffix] += 1
-                suffix_examples.setdefault(suffix, [])
-                if len(suffix_examples[suffix]) < 3:
-                    suffix_examples[suffix].append(name)
-
-    results = []
-
-    # Filter: must appear 5+ times, must not be a trivially common English substring
-    SKIP_AFFIXES = {
-        "er", "ed", "ing", "ion", "al", "tion", "le", "or", "is", "at",
-        "get", "set", "has", "is_", "_is", "on", "re", "un", "de",
-    }
-
-    for prefix, count in prefix_counts.most_common(30):
-        if count >= min_count and prefix.lower() not in SKIP_AFFIXES and len(prefix) >= min_len:
-            results.append({
-                "pattern": f"{prefix}_ prefix" if not prefix.endswith("_") else f"{prefix} prefix",
-                "count": count,
-                "examples": prefix_examples.get(prefix, []),
-            })
-
-    for suffix, count in suffix_counts.most_common(30):
-        if count >= min_count and suffix.lower() not in SKIP_AFFIXES and len(suffix) >= min_len:
-            results.append({
-                "pattern": f"_{suffix} suffix" if not suffix.startswith("_") else f"{suffix} suffix",
-                "count": count,
-                "examples": suffix_examples.get(suffix, []),
-            })
-
-    # Deduplicate and limit
-    seen = set()
-    deduped = []
-    for r in sorted(results, key=lambda x: -x["count"]):
-        key = r["pattern"]
-        if key not in seen:
-            seen.add(key)
-            deduped.append(r)
-        if len(deduped) >= 10:
-            break
-
-    return deduped
-
+# ---------------------------------------------------------------------------
+# Language extractors
+# ---------------------------------------------------------------------------
 
 def _extract_python(files: list[Path]) -> dict:
     functions: list[str] = []
@@ -163,9 +181,7 @@ def _extract_python(files: list[Path]) -> dict:
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 name = node.name
                 functions.append(name)
-                if name.startswith("__") and name.endswith("__"):
-                    pass  # dunder, already in functions
-                elif name.startswith("__"):
+                if name.startswith("__") and not name.endswith("__"):
                     private_double.append(name)
                 elif name.startswith("_"):
                     private_single.append(name)
@@ -239,11 +255,32 @@ def _extract_ts(files: list[Path], lang: str) -> dict:
     }
 
 
+def _extract_go_constants(lines: list[str], const_re: re.Pattern) -> list[str]:
+    """Extract constant names from a Go file's const blocks."""
+    constants: list[str] = []
+    in_const = False
+
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("const ("):
+            in_const = True
+            continue
+        if in_const and stripped == ")":
+            in_const = False
+            continue
+        if in_const:
+            m = const_re.match(line)
+            if m:
+                constants.append(m.group(1))
+
+    return constants
+
+
 def _extract_go(files: list[Path]) -> dict:
-    func_re    = re.compile(r"^func\s+(?:\(\w+\s+\*?\w+\)\s+)?(\w+)\s*\(")
-    type_re    = re.compile(r"^type\s+(\w+)\s+(?:struct|interface)")
-    const_re   = re.compile(r"^\s+(\w+)\s*(?:=|[A-Z])")
-    var_re     = re.compile(r"^var\s+(\w+)\s+")
+    func_re  = re.compile(r"^func\s+(?:\(\w+\s+\*?\w+\)\s+)?(\w+)\s*\(")
+    type_re  = re.compile(r"^type\s+(\w+)\s+(?:struct|interface)")
+    const_re = re.compile(r"^\s+(\w+)\s*(?:=|[A-Z])")
+    var_re   = re.compile(r"^var\s+(\w+)\s+")
 
     functions: list[str] = []
     classes: list[str] = []
@@ -257,20 +294,9 @@ def _extract_go(files: list[Path]) -> dict:
         except Exception:
             continue
 
-        in_const = False
-        for line in lines:
-            stripped = line.strip()
-            if stripped.startswith("const ("):
-                in_const = True
-                continue
-            if in_const and stripped == ")":
-                in_const = False
-                continue
-            if in_const:
-                m = const_re.match(line)
-                if m:
-                    constants.append(m.group(1))
+        constants.extend(_extract_go_constants(lines, const_re))
 
+        for line in lines:
             m = func_re.match(line)
             if m:
                 functions.append(m.group(1))
@@ -288,6 +314,10 @@ def _extract_go(files: list[Path]) -> dict:
         "files": _pattern_summary(file_names),
     }
 
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
 
 def extract_symbols(repo_path: str, lang_filter: str | None = None) -> dict:
     repo = Path(repo_path).resolve()
