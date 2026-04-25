@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Dict, List, Any
 from dataclasses import dataclass
 
-
 @dataclass
 class SynthesisConfig:
     """Configuration for AGENTS.md generation."""
@@ -18,7 +17,6 @@ class SynthesisConfig:
     confidence_threshold: float = 0.6
     max_examples_per_section: int = 3
 
-
 class AgentSynthesizer:
     """Synthesizes AGENTS.md from analysis results."""
 
@@ -29,44 +27,33 @@ class AgentSynthesizer:
         """Generate AGENTS.md content from analysis results."""
         sections = []
 
-        # Overview
         if self.config.include_overview:
             sections.append(self._generate_overview(analyses, repos))
 
-        # Cross-language patterns
         if self.config.include_cross_language:
             sections.append(self._generate_cross_language(analyses))
 
-        # Per-language sections
         sections.append(self._generate_language_sections(analyses))
 
-        # Repository Structure
         if self.config.include_structure:
             sections.append(self._generate_structure_section(analyses))
 
-        # Commands and Workflows
         if self.config.include_commands:
             sections.append(self._generate_commands_section(analyses))
 
-        # Git
         if self.config.include_git:
             sections.append(self._generate_git_section(analyses))
 
-        # Tooling
         if self.config.include_tooling:
             sections.append(self._generate_tooling_section(analyses))
 
-        # Dependencies
         sections.append(self._generate_dependencies_section(analyses))
 
-        # Red Lines
         if self.config.include_red_lines:
             sections.append(self._generate_red_lines(analyses))
 
-        # Code Examples
         sections.append(self._generate_examples_section(analyses))
 
-        # Footer
         sections.append(self._generate_footer(analyses, repos))
 
         return "\n\n".join(sections)
@@ -89,7 +76,7 @@ class AgentSynthesizer:
             lines.append("*No representative examples extracted.*")
             return "\n".join(lines)
         
-        for i, example in enumerate(all_examples[:10], 1):  # Limit to 10
+        for i, example in enumerate(all_examples[:10], 1):
             lines.append(f"### Example {i}")
             lines.append("")
             lines.append("```")
@@ -117,7 +104,6 @@ class AgentSynthesizer:
             "Key principles distilled from actual patterns:",
         ]
 
-        # Extract key principles
         principles = self._extract_key_principles(analyses)
         for principle in principles[:3]:
             lines.append(f"- {principle}")
@@ -178,7 +164,6 @@ class AgentSynthesizer:
         """Format a single language section."""
         lines = []
 
-        # Naming
         naming = data.get("naming", {})
         if naming:
             lines.append("### Naming")
@@ -187,7 +172,6 @@ class AgentSynthesizer:
                     dominant = info.get("dominant_case", "unknown")
                     lines.append(f"- **{category.title()}:** {dominant}")
 
-        # Type Annotations
         type_annotations = data.get("type_annotations", {})
         if type_annotations and type_annotations.get("total_functions", 0) > 0:
             lines.append("")
@@ -202,7 +186,6 @@ class AgentSynthesizer:
                 lines.append(f"- **Param density:** Low ({density:.0%})")
             lines.append(f"- **Return density:** {return_density:.0%}")
 
-        # Import Order
         import_order = data.get("import_order", {})
         if import_order and import_order.get("style"):
             style = import_order["style"]
@@ -211,7 +194,6 @@ class AgentSynthesizer:
                 lines.append("### Import Order")
                 lines.append(f"- **Style:** {style}")
 
-        # Error Handling
         errors = data.get("error_handling", {})
         if errors and not errors.get("note"):
             lines.append("")
@@ -220,7 +202,6 @@ class AgentSynthesizer:
                 if isinstance(count, int) and count > 0:
                     lines.append(f"- `{pattern}`: {count} occurrences")
 
-        # Comments
         comments = data.get("comments", {})
         if comments:
             lines.append("")
@@ -231,7 +212,6 @@ class AgentSynthesizer:
             if "doc_style" in comments:
                 lines.append(f"- **Style:** `{comments['doc_style']}`")
 
-        # Spacing
         spacing = data.get("spacing", {})
         if spacing:
             avg_blanks = spacing.get("avg_blank_lines", 0)
@@ -240,7 +220,6 @@ class AgentSynthesizer:
                 lines.append("### Spacing")
                 lines.append(f"- **Avg blank lines between blocks:** {avg_blanks:.1f}")
 
-        # File count
         file_count = data.get("file_count", 0)
         if file_count > 0:
             lines.append(f"\n*{file_count} files analyzed*")
@@ -278,7 +257,6 @@ class AgentSynthesizer:
             if depth_stats.get("max"):
                 max_depths.append(depth_stats["max"])
 
-        # File naming
         if all_file_naming:
             from collections import Counter
             dominant = Counter(all_file_naming).most_common(1)[0][0]
@@ -286,7 +264,6 @@ class AgentSynthesizer:
             lines.append(f"- **Dominant style:** {dominant}")
             lines.append("")
 
-        # Directory depth
         if max_depths:
             avg_depth = sum(max_depths) / len(max_depths)
             lines.append(f"### Directory Depth")
@@ -294,7 +271,6 @@ class AgentSynthesizer:
             lines.append(f"- **Average:** {avg_depth:.1f} levels")
             lines.append("")
 
-        # Test patterns
         if all_test_patterns:
             lines.append(f"### Test Organization")
             test_locations = set()
@@ -311,7 +287,6 @@ class AgentSynthesizer:
                 lines.append(f"- **Frameworks:** {', '.join(sorted(frameworks))}")
             lines.append("")
 
-        # Module patterns
         if all_module_patterns:
             lines.append(f"### Module Patterns")
             barrel_count = sum(1 for mp in all_module_patterns if mp.get("has_barrel_files"))
@@ -333,7 +308,6 @@ class AgentSynthesizer:
             "",
         ]
 
-        # Aggregate commands across repos
         all_commands = {}
         for analysis in analyses:
             commands = analysis.get("commands", {})
@@ -355,7 +329,7 @@ class AgentSynthesizer:
                 continue
 
             lines.append(f"### {category.title()}")
-            for cmd in all_commands[category][:5]:  # Limit to 5 per category
+            for cmd in all_commands[category][:5]:
                 cmd_str = cmd.get("command", "")
                 source = cmd.get("source", "")
                 if len(cmd_str) < 80:
@@ -414,7 +388,6 @@ class AgentSynthesizer:
             "",
         ]
 
-        # Commits
         commit_data = []
         prefixes = {}
         avg_lengths = []
@@ -437,7 +410,6 @@ class AgentSynthesizer:
                 avg = sum(avg_lengths) / len(avg_lengths)
                 lines.append(f"- **Avg length:** {avg:.0f} chars")
 
-        # Branches
         branch_prefixes = {}
         for analysis in analyses:
             git = analysis.get("git", {})
@@ -525,7 +497,6 @@ class AgentSynthesizer:
         """Extract key principles from analyses."""
         principles = []
 
-        # Check for self-documenting code
         low_comment_density = all(
             lang.get("comments", {}).get("density", 1) < 0.1
             for analysis in analyses
@@ -534,10 +505,8 @@ class AgentSynthesizer:
         if low_comment_density:
             principles.append("Self-documenting code over verbose comments")
 
-        # Check for descriptive naming
         principles.append("Descriptive names over terse abbreviations")
 
-        # Check for fail-fast patterns
         has_unwrap = any(
             lang.get("error_handling", {}).get("unwrap", 0) > 0
             for analysis in analyses
@@ -552,7 +521,6 @@ class AgentSynthesizer:
         """Find patterns common across languages."""
         patterns = {}
 
-        # Check for consistent naming
         naming_consistency = {}
         for analysis in analyses:
             for lang, data in analysis.get("languages", {}).items():
@@ -570,7 +538,6 @@ class AgentSynthesizer:
                 if len(styles) == 1:
                     patterns["naming"][cat] = list(styles.keys())[0]
 
-        # Comment philosophy
         doc_styles = set()
         for analysis in analyses:
             for lang, data in analysis.get("languages", {}).items():
@@ -587,7 +554,6 @@ class AgentSynthesizer:
         """Extract explicit avoidances from actual codebase patterns."""
         red_lines = []
 
-        # Error handling red lines
         has_unwrap = False
         has_expect = False
         for analysis in analyses:
@@ -603,7 +569,6 @@ class AgentSynthesizer:
         elif has_expect and not has_unwrap:
             red_lines.append("Prefer expect() over unwrap() — always provide context on failure")
 
-        # Naming consistency red lines
         naming_violations = []
         for analysis in analyses:
             for lang, data in analysis.get("languages", {}).items():
@@ -620,16 +585,13 @@ class AgentSynthesizer:
                                 naming_violations.append(f"Strict {style} for {cat}")
 
         if naming_violations:
-            # Deduplicate while preserving order
             seen = set()
             for violation in naming_violations:
                 if violation not in seen:
                     seen.add(violation)
-            # Only emit naming red lines if there are violations worth noting
             if seen:
                 red_lines.append("No mixing naming conventions within categories")
 
-        # Comment style red lines — look at languages with meaningful comment volume
         for analysis in analyses:
             for lang, data in analysis.get("languages", {}).items():
                 comments = data.get("comments", {})

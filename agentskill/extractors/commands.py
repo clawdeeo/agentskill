@@ -4,7 +4,6 @@ import re
 from pathlib import Path
 from typing import Dict, List, Optional
 
-
 def extract_commands(repo_path: str) -> Dict:
     """Extract build, test, and dev commands from project configs."""
     repo = Path(repo_path)
@@ -32,7 +31,6 @@ def extract_commands(repo_path: str) -> Dict:
     _extract_from_github_actions(repo, commands)
 
     return {k: v for k, v in commands.items() if v}
-
 
 def _extract_from_package_json(repo: Path, commands: Dict):
     """Extract scripts from package.json."""
@@ -66,7 +64,6 @@ def _extract_from_package_json(repo: Path, commands: Dict):
     except Exception:
         pass
 
-
 def _extract_from_makefile(repo: Path, commands: Dict):
     """Extract targets from Makefile."""
     makefile = repo / "Makefile"
@@ -98,7 +95,6 @@ def _extract_from_makefile(repo: Path, commands: Dict):
                     })
     except Exception:
         pass
-
 
 def _extract_from_justfile(repo: Path, commands: Dict):
     """Extract recipes from justfile."""
@@ -132,7 +128,6 @@ def _extract_from_justfile(repo: Path, commands: Dict):
                     })
     except Exception:
         pass
-
 
 def _extract_from_cargo(repo: Path, commands: Dict):
     """Extract commands from Cargo.toml metadata."""
@@ -171,7 +166,6 @@ def _extract_from_cargo(repo: Path, commands: Dict):
             })
     except Exception:
         pass
-
 
 def _extract_from_pyproject(repo: Path, commands: Dict):
     """Extract commands from pyproject.toml."""
@@ -218,7 +212,6 @@ def _extract_from_pyproject(repo: Path, commands: Dict):
     except Exception:
         pass
 
-
 def _extract_from_setup_py(repo: Path, commands: Dict):
     """Extract install/test commands from setup.py."""
     setup_py = repo / "setup.py"
@@ -247,7 +240,6 @@ def _extract_from_setup_py(repo: Path, commands: Dict):
     except Exception:
         pass
 
-
 def _extract_from_requirements(repo: Path, commands: Dict):
     """Extract install command from requirements.txt."""
     req = repo / "requirements.txt"
@@ -267,7 +259,6 @@ def _extract_from_requirements(repo: Path, commands: Dict):
             "source": "requirements-dev.txt",
         })
 
-
 def _extract_from_tox(repo: Path, commands: Dict):
     """Extract test environments from tox.ini."""
     tox_ini = repo / "tox.ini"
@@ -282,7 +273,6 @@ def _extract_from_tox(repo: Path, commands: Dict):
 
     try:
         content = tox_ini.read_text(errors='ignore')
-        # Extract environment names like [testenv:py312] or [testenv:lint]
         envs = re.findall(r'\[testenv:([^\]]+)\]', content)
         for env in envs[:5]:
             commands["test"].append({
@@ -292,7 +282,6 @@ def _extract_from_tox(repo: Path, commands: Dict):
             })
     except Exception:
         pass
-
 
 def _extract_from_scripts(repo: Path, commands: Dict):
     """Extract CLI entry points from scripts/ folder and setup.py console_scripts."""
@@ -306,14 +295,12 @@ def _extract_from_scripts(repo: Path, commands: Dict):
                     "source": f"{scripts_dir.name}/",
                 })
 
-    # Also check setup.py for console_scripts
     setup_py = repo / "setup.py"
     if setup_py.exists():
         try:
             content = setup_py.read_text(errors='ignore')
             entry_points = re.findall(r'console_scripts\s*=\s*\[(.*?)\]', content, re.DOTALL)
             for ep_block in entry_points:
-                # Extract "name = module.path:function" patterns
                 eps = re.findall(r'["\']([\w-]+)["\']\s*=\s*["\']([\w.]+):', ep_block)
                 for name, module in eps:
                     commands["dev"].append({
@@ -323,7 +310,6 @@ def _extract_from_scripts(repo: Path, commands: Dict):
                     })
         except Exception:
             pass
-
 
 def _extract_from_docker(repo: Path, commands: Dict):
     """Extract Docker-related commands."""
@@ -342,7 +328,6 @@ def _extract_from_docker(repo: Path, commands: Dict):
             "source": compose_file,
         })
 
-
 def _extract_from_github_actions(repo: Path, commands: Dict):
     """Extract CI commands from GitHub Actions workflows."""
     workflows_dir = repo / ".github" / "workflows"
@@ -355,7 +340,6 @@ def _extract_from_github_actions(repo: Path, commands: Dict):
         try:
             content = workflow.read_text(errors='ignore')
 
-            # Extract run commands from workflow steps
             runs = re.findall(r'-\s*run:\s*[\'"]?(.+?)[\'"]?\s*$', content, re.MULTILINE)
             for run_cmd in runs:
                 run_cmd = run_cmd.strip()

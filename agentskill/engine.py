@@ -46,12 +46,12 @@ def detect_case_style(name: str) -> str:
 
 def extract_identifiers(line: str) -> List[str]:
     """Extract potential identifiers from a line of code."""
-    # Match word sequences that could be variable/function/type names
+
     patterns = [
-        r'(?:let|var|const|def|fn|func|function)\s+(mut\s+)?(\w+)',  # declarations
-        r'(?:struct|class|enum|trait|type|interface)\s+(\w+)',       # type declarations
-        r'(?:use|import)\s+(?:[\w\.]*)?(\w+)',                       # imports
-        r'(\w+)\s*[=:]\s*[^=]',                                        # assignments with type hints
+        r'(?:let|var|const|def|fn|func|function)\s+(mut\s+)?(\w+)',
+        r'(?:struct|class|enum|trait|type|interface)\s+(\w+)',
+        r'(?:use|import)\s+(?:[\w\.]*)?(\w+)',
+        r'(\w+)\s*[=:]\s*[^=]',
     ]
     
     identifiers = []
@@ -70,7 +70,7 @@ def analyze_file_content(filepath: Path, content: str) -> Dict:
     lines = content.split('\n')
     total_lines = len(lines)
     
-    # Initialize counters
+
     naming = {"vars": {}, "functions": {}, "types": {}, "consts": {}}
     comments = {"total": 0, "doc": 0, "normal": 0, "density": 0.0}
     spacing = {"blank_lines": 0, "avg_between_blocks": 0.0}
@@ -85,7 +85,7 @@ def analyze_file_content(filepath: Path, content: str) -> Dict:
     for i, line in enumerate(lines):
         stripped = line.strip()
         
-        # Track blank lines
+
         if not stripped:
             current_blank_streak += 1
             continue
@@ -94,8 +94,6 @@ def analyze_file_content(filepath: Path, content: str) -> Dict:
             blank_line_counts.append(current_blank_streak)
             current_blank_streak = 0
         
-        # Comment detection (language agnostic patterns)
-        # Handle continuation of multi-line doc comments first
         if in_doc_comment:
             comments["total"] += 1
             comments["doc"] += 1
@@ -108,7 +106,7 @@ def analyze_file_content(filepath: Path, content: str) -> Dict:
         elif stripped.startswith('/*'):
             comments["doc"] += 1
             comments["total"] += 1
-            # Only enter multi-line mode if closing marker is not on same line
+
             if '*/' not in stripped:
                 in_doc_comment = True
                 doc_comment_marker = '*/'
@@ -116,7 +114,7 @@ def analyze_file_content(filepath: Path, content: str) -> Dict:
             comments["doc"] += 1
             comments["total"] += 1
             quote = '"""' if stripped.startswith('"""') else "'''"
-            # Only enter multi-line mode if closing quote is not on same line
+
             if stripped.count(quote) < 2:
                 in_doc_comment = True
                 doc_comment_marker = quote
@@ -124,12 +122,12 @@ def analyze_file_content(filepath: Path, content: str) -> Dict:
             comments["normal"] += 1
             comments["total"] += 1
         
-        # Extract identifiers and categorize by context
+
         identifiers = extract_identifiers(line)
         for name in identifiers:
             style = detect_case_style(name)
             
-            # Categorize based on surrounding context
+
             if re.search(r'\b(const|static)\b', line, re.I):
                 naming["consts"][style] = naming["consts"].get(style, 0) + 1
             elif re.search(r'\b(struct|class|enum|trait|interface|type)\b', line):
@@ -141,18 +139,18 @@ def analyze_file_content(filepath: Path, content: str) -> Dict:
             else:
                 naming["vars"][style] = naming["vars"].get(style, 0) + 1
         
-        # Import detection
+
         if re.match(r'^(import|from|use|require|include)\s+', stripped):
-            # Simple heuristic: dots or relative paths = local
+
             if '.' in stripped and not re.search(r'\d', stripped.split()[-1]):
                 imports["local"] += 1
-            # std keywords = stdlib
+
             elif any(std in stripped for std in ['std', 'os', 'sys', 'io', 'fmt']):
                 imports["stdlib"] += 1
             else:
                 imports["third_party"] += 1
         
-        # Error handling patterns (generic)
+
         error_patterns = [
             (r'\?\s*$', "try_operator"),
             (r'try\s*{|try\s*:', "try_block"),
@@ -165,7 +163,7 @@ def analyze_file_content(filepath: Path, content: str) -> Dict:
             if re.search(pattern, stripped):
                 errors[key] = errors.get(key, 0) + 1
     
-    # Calculate derived metrics
+
     code_lines = total_lines - comments["total"] - sum(blank_line_counts)
     if code_lines > 0:
         comments["density"] = comments["total"] / code_lines
@@ -217,12 +215,12 @@ def extract_code_examples(files: List[Path], max_examples: int = 10) -> List[str
             content = filepath.read_text(errors='ignore')
             lines = content.split('\n')
             
-            # Find interesting lines (function defs, type defs, etc.)
+
             interesting = []
             for i, line in enumerate(lines):
                 if any(kw in line for kw in ['def ', 'fn ', 'func ', 'function ',
                                               'class ', 'struct ', 'enum ', 'trait ']):
-                    # Extract context: line before, line itself, line after
+
                     context = []
                     if i > 0:
                         context.append(lines[i-1].rstrip())
@@ -272,12 +270,12 @@ def analyze_codebase(repo_path: str, files_by_ext: Dict[str, List[Path]]) -> Ana
             "metrics": {"total_lines": 0, "file_count": 0},
         }
         
-        for filepath in files[:50]:  # Sample first 50 files per language
+        for filepath in files[:50]:
             try:
                 content = filepath.read_text(errors='ignore')
                 file_analysis = analyze_file_content(filepath, content)
                 
-                # Merge into language totals
+
                 for category in ["vars", "functions", "types", "consts"]:
                     for style, count in file_analysis["naming"].get(category, {}).get("counts", {}).items():
                         current = lang_data["naming"][category].get(style, 0)
@@ -298,11 +296,11 @@ def analyze_codebase(repo_path: str, files_by_ext: Dict[str, List[Path]]) -> Ana
             except Exception:
                 continue
         
-        # Add dominant case info
+
         for category in ["vars", "functions", "types", "consts"]:
             lang_data["naming"][category] = _add_dominant(lang_data["naming"][category])
         
-        # Calculate overall density
+
         total_lines = lang_data["metrics"]["total_lines"]
         comment_lines = lang_data["comments"]["total"]
         if total_lines > comment_lines:
@@ -310,7 +308,7 @@ def analyze_codebase(repo_path: str, files_by_ext: Dict[str, List[Path]]) -> Ana
         
         languages[lang] = lang_data
     
-    # Extract examples from all files
+
     examples = extract_code_examples(all_files, max_examples=15)
     
     return AnalysisResult(

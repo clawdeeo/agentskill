@@ -4,7 +4,6 @@ import os
 from pathlib import Path
 from typing import Dict, List, Optional
 
-
 FILE_NAMING_PATTERNS = {
     "snake_case": lambda f: '_' in f and f == f.lower() and not f.startswith('.'),
     "kebab-case": lambda f: '-' in f and f == f.lower() and not f.startswith('.'),
@@ -37,7 +36,6 @@ ASSET_DIRS = {
     "assets", "static", "public", "resources", "templates",
 }
 
-
 def extract_repo_structure(repo_path: str) -> Dict:
     """Extract repository directory structure and conventions."""
     repo = Path(repo_path)
@@ -62,7 +60,6 @@ def extract_repo_structure(repo_path: str) -> Dict:
 
     return result
 
-
 def _scan_structure(repo: Path, current: Path, depth: int, max_depth: int) -> Dict:
     """Recursively scan directory structure."""
     if depth > max_depth:
@@ -84,7 +81,6 @@ def _scan_structure(repo: Path, current: Path, depth: int, max_depth: int) -> Di
         result[d.name] = _scan_structure(repo, d, depth + 1, max_depth)
 
     return result
-
 
 def _analyze_file_naming(repo: Path) -> Dict:
     """Analyze file naming conventions across the repo."""
@@ -132,7 +128,6 @@ def _analyze_file_naming(repo: Path) -> Dict:
         "extensions": dict(sorted(extensions.items(), key=lambda x: -x[1])[:10]),
     }
 
-
 def _analyze_test_patterns(repo: Path, structure: Dict) -> Dict:
     """Detect test organization and patterns."""
     result = {
@@ -176,7 +171,6 @@ def _analyze_test_patterns(repo: Path, structure: Dict) -> Dict:
     elif test_file_patterns:
         result["test_location"] = "colocated"
 
-    # Detect frameworks from config files
     frameworks = []
     framework_markers = {
         "pytest.ini": "pytest",
@@ -200,7 +194,6 @@ def _analyze_test_patterns(repo: Path, structure: Dict) -> Dict:
     result["test_framework"] = frameworks
 
     return result
-
 
 def _analyze_module_patterns(repo: Path, structure: Dict) -> Dict:
     """Detect module organization patterns."""
@@ -229,7 +222,6 @@ def _analyze_module_patterns(repo: Path, structure: Dict) -> Dict:
         if init_markers & file_set:
             result["has_init_files"] = True
 
-    # Identify source directories
     for d in sorted(repo.iterdir()):
         if d.is_dir() and not d.name.startswith('.'):
             if d.name in SOURCE_DIRS:
@@ -238,7 +230,6 @@ def _analyze_module_patterns(repo: Path, structure: Dict) -> Dict:
                 result["config_dirs"].append(d.name)
 
     return result
-
 
 def _analyze_depth(repo: Path) -> Dict:
     """Analyze directory depth distribution."""

@@ -21,10 +21,10 @@ def analyze_repository(repo_path: str) -> dict:
     if not is_git_repo(abs_path):
         print(f"Warning: {repo_path} may not be a git repository", file=sys.stderr)
     
-    # Scan for source files and group by extension
+
     files_by_lang = scan_source_files(abs_path)
     
-    # Group by extension for the engine
+
     files_by_ext = {}
     for lang, files in files_by_lang.items():
         for filepath in files:
@@ -33,10 +33,10 @@ def analyze_repository(repo_path: str) -> dict:
                 files_by_ext[ext] = []
             files_by_ext[ext].append(filepath)
     
-    # Run the agnostic engine
+
     result = analyze_codebase(abs_path, files_by_ext)
     
-    # Add other extractions
+
     result_dict = {
         "path": abs_path,
         "languages": result.languages,
@@ -101,7 +101,7 @@ Examples:
     
     args = parser.parse_args()
     
-    # Validate repos
+
     valid_repos = []
     for repo in args.repos:
         if Path(repo).is_dir():
@@ -113,28 +113,28 @@ Examples:
         print("Error: No valid repositories to analyze", file=sys.stderr)
         sys.exit(1)
     
-    # Analyze each repo
+
     analyses = []
     for repo in valid_repos:
         print(f"Analyzing {repo}...", file=sys.stderr)
         analysis = analyze_repository(repo)
         analyses.append(analysis)
     
-    # Build report
+
     if args.json:
         output = json.dumps({
             "repos": valid_repos,
             "analyses": analyses,
         }, indent=JSON_INDENT)
     else:
-        # Generate AGENTS.md
+
         config = SynthesisConfig(
             include_git=not args.skip_git,
             include_tooling=not args.skip_tooling,
         )
         output = generate_agents_md(analyses, valid_repos, config)
     
-    # Output
+
     if args.output:
         Path(args.output).write_text(output)
         print(f"Output written to {args.output}", file=sys.stderr)
