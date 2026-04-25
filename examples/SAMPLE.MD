@@ -1,4 +1,4 @@
-# AGENTS.md — Coding Style: Airscript
+# AGENTS.md — Coding Style
 
 ## Overview
 
@@ -82,6 +82,6 @@ Pragmatic tool-builder. Self-documenting code over verbose comments, descriptive
 
 ---
 
-**Source:** airscripts/gitclaw (68 commits, 40 Rust files)
+**Source:** Sample repository (68 commits, 40 Rust files)
 
 **Confidence:** High on naming/git patterns; Medium on branch conventions (limited sample)
