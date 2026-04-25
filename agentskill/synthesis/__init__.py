@@ -1,8 +1,10 @@
 """AGENTS.md synthesis from analysis results."""
 
+from collections import Counter
 from pathlib import Path
 from typing import Dict, List, Any
 from dataclasses import dataclass
+
 
 @dataclass
 class SynthesisConfig:
@@ -16,6 +18,7 @@ class SynthesisConfig:
     include_commands: bool = True
     confidence_threshold: float = 0.6
     max_examples_per_section: int = 3
+
 
 class AgentSynthesizer:
     """Synthesizes AGENTS.md from analysis results."""
@@ -59,23 +62,22 @@ class AgentSynthesizer:
         return "\n\n".join(sections)
 
     def _generate_examples_section(self, analyses: List[Dict]) -> str:
-        """Generate Code Examples section from actual codebase."""
         lines = [
             "## Code Examples",
             "",
             "Actual patterns from the codebase:",
             "",
         ]
-        
+
         all_examples = []
         for analysis in analyses:
             examples = analysis.get("examples", [])
             all_examples.extend(examples)
-        
+
         if not all_examples:
             lines.append("*No representative examples extracted.*")
             return "\n".join(lines)
-        
+
         for i, example in enumerate(all_examples[:10], 1):
             lines.append(f"### Example {i}")
             lines.append("")
@@ -83,11 +85,10 @@ class AgentSynthesizer:
             lines.append(example)
             lines.append("```")
             lines.append("")
-        
+
         return "\n".join(lines)
 
     def _generate_overview(self, analyses: List[Dict], repos: List[str]) -> str:
-        """Generate overview section."""
         languages = self._detected_languages(analyses)
         lang_str = ", ".join(sorted(languages)) if languages else "various languages"
 
@@ -111,7 +112,6 @@ class AgentSynthesizer:
         return "\n".join(lines)
 
     def _generate_cross_language(self, analyses: List[Dict]) -> str:
-        """Generate cross-language patterns section."""
         lines = [
             "## Cross-Language Patterns",
             "",
@@ -143,7 +143,6 @@ class AgentSynthesizer:
         return "\n".join(lines)
 
     def _generate_language_sections(self, analyses: List[Dict]) -> str:
-        """Generate per-language sections."""
         sections = []
         all_langs = self._detected_languages(analyses)
 
@@ -161,7 +160,6 @@ class AgentSynthesizer:
         return "".join(sections)
 
     def _format_language_section(self, lang: str, data: Dict) -> str:
-        """Format a single language section."""
         lines = []
 
         naming = data.get("naming", {})
@@ -227,7 +225,6 @@ class AgentSynthesizer:
         return "\n".join(lines)
 
     def _generate_structure_section(self, analyses: List[Dict]) -> str:
-        """Generate Repository Structure section."""
         lines = [
             "## Repository Structure",
             "",
@@ -258,7 +255,6 @@ class AgentSynthesizer:
                 max_depths.append(depth_stats["max"])
 
         if all_file_naming:
-            from collections import Counter
             dominant = Counter(all_file_naming).most_common(1)[0][0]
             lines.append(f"### File Naming")
             lines.append(f"- **Dominant style:** {dominant}")
@@ -302,7 +298,6 @@ class AgentSynthesizer:
         return "\n".join(lines)
 
     def _generate_commands_section(self, analyses: List[Dict]) -> str:
-        """Generate Commands and Workflows section."""
         lines = [
             "## Commands and Workflows",
             "",
@@ -341,7 +336,6 @@ class AgentSynthesizer:
         return "\n".join(lines)
 
     def _generate_dependencies_section(self, analyses: List[Dict]) -> str:
-        """Generate Dependencies section."""
         lines = [
             "## Dependencies",
             "",
@@ -375,20 +369,17 @@ class AgentSynthesizer:
             lines.append(f"- **Average dependency count:** {avg_deps:.0f} per project")
 
         if pin_styles:
-            from collections import Counter
             dominant_pin = Counter(pin_styles).most_common(1)[0][0]
             lines.append(f"- **Pin style:** {dominant_pin}")
 
         return "\n".join(lines)
 
     def _generate_git_section(self, analyses: List[Dict]) -> str:
-        """Generate Git section."""
         lines = [
             "## Git",
             "",
         ]
 
-        commit_data = []
         prefixes = {}
         avg_lengths = []
 
@@ -427,7 +418,6 @@ class AgentSynthesizer:
         return "\n".join(lines)
 
     def _generate_tooling_section(self, analyses: List[Dict]) -> str:
-        """Generate Tooling section."""
         all_tools = set()
         for analysis in analyses:
             tools = analysis.get("tooling", {})
@@ -448,7 +438,6 @@ class AgentSynthesizer:
         return "\n".join(lines)
 
     def _generate_red_lines(self, analyses: List[Dict]) -> str:
-        """Generate Red Lines section."""
         lines = [
             "## Red Lines",
             "",
@@ -466,8 +455,6 @@ class AgentSynthesizer:
         return "\n".join(lines)
 
     def _generate_footer(self, analyses: List[Dict], repos: List[str]) -> str:
-        """Generate footer with source and confidence."""
-        from pathlib import Path
         repo_names = [Path(r).resolve().name for r in repos]
         source_str = ", ".join(repo_names) if repo_names else "unknown"
 
@@ -487,14 +474,12 @@ class AgentSynthesizer:
         return "\n".join(lines)
 
     def _detected_languages(self, analyses: List[Dict]) -> set:
-        """Extract all detected languages."""
         langs = set()
         for analysis in analyses:
             langs.update(analysis.get("languages", {}).keys())
         return langs
 
     def _extract_key_principles(self, analyses: List[Dict]) -> List[str]:
-        """Extract key principles from analyses."""
         principles = []
 
         low_comment_density = all(
@@ -518,7 +503,6 @@ class AgentSynthesizer:
         return principles
 
     def _find_common_patterns(self, analyses: List[Dict]) -> Dict:
-        """Find patterns common across languages."""
         patterns = {}
 
         naming_consistency = {}
@@ -551,7 +535,6 @@ class AgentSynthesizer:
         return patterns
 
     def _extract_red_lines(self, analyses: List[Dict]) -> List[str]:
-        """Extract explicit avoidances from actual codebase patterns."""
         red_lines = []
 
         has_unwrap = False

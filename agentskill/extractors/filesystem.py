@@ -1,22 +1,27 @@
 """Filesystem extraction utilities."""
 
+import json
 import os
 from pathlib import Path
 from typing import Dict, List
 
-from ..constants import EXTENSIONS, SKIP_DIRS, HIDDEN_PREFIX, GIT_DIR
+from ..constants import EXTENSIONS, LOCKFILES, SKIP_DIRS, HIDDEN_PREFIX, GIT_DIR, TOOL_FILES
+
 
 def is_hidden_path(root: Path) -> bool:
     """Check if path contains hidden directories."""
     return any(part.startswith(HIDDEN_PREFIX) for part in root.parts)
 
+
 def should_skip_dir(root: Path) -> bool:
     """Check if directory should be skipped."""
     return bool(SKIP_DIRS.intersection(root.parts))
 
+
 def is_git_repo(repo_path: str) -> bool:
     """Check if path is a git repository."""
     return os.path.isdir(os.path.join(repo_path, GIT_DIR))
+
 
 def scan_source_files(repo_path: str) -> Dict[str, List[Path]]:
     """Scan for source files by language."""
@@ -35,6 +40,7 @@ def scan_source_files(repo_path: str) -> Dict[str, List[Path]]:
 
     return {k: v for k, v in files_by_lang.items() if v}
 
+
 def analyze_dependency_philosophy(repo_path: str) -> Dict:
     """Analyze dependency management philosophy."""
     repo = Path(repo_path)
@@ -46,18 +52,7 @@ def analyze_dependency_philosophy(repo_path: str) -> Dict:
         "manager": "unknown",
     }
 
-    lockfiles = {
-        "Cargo.lock": "cargo",
-        "package-lock.json": "npm",
-        "yarn.lock": "yarn",
-        "pnpm-lock.yaml": "pnpm",
-        "poetry.lock": "poetry",
-        "Pipfile.lock": "pipenv",
-        "go.sum": "go",
-        "Gemfile.lock": "bundler",
-        "composer.lock": "composer",
-    }
-    for lf, manager in lockfiles.items():
+    for lf, manager in LOCKFILES.items():
         if (repo / lf).exists():
             result["lockfiles"].append(lf)
             result["manager"] = manager
@@ -65,7 +60,6 @@ def analyze_dependency_philosophy(repo_path: str) -> Dict:
     pkg = repo / "package.json"
     if pkg.exists():
         try:
-            import json
             data = json.loads(pkg.read_text(errors='ignore'))
             deps = len(data.get("dependencies", {}))
             dev_deps = len(data.get("devDependencies", {}))
@@ -106,10 +100,9 @@ def analyze_dependency_philosophy(repo_path: str) -> Dict:
 
     return result
 
+
 def detect_tooling(repo_path: str) -> Dict:
     """Detect tooling configs (linters, formatters, CI)."""
-    from ..constants import TOOL_FILES
-
     repo = Path(repo_path)
     detected = {}
 
@@ -120,20 +113,7 @@ def detect_tooling(repo_path: str) -> Dict:
     if (repo / ".github" / "workflows").exists():
         detected["GitHub Actions CI"] = True
 
-    lockfiles = {
-        "Cargo.lock": "cargo",
-        "package-lock.json": "npm",
-        "yarn.lock": "yarn",
-        "pnpm-lock.yaml": "pnpm",
-        "poetry.lock": "poetry",
-        "Pipfile.lock": "pipenv",
-        "go.sum": "go",
-        "Gemfile.lock": "bundler",
-        "composer.lock": "composer",
-        "mix.lock": "mix",
-        "flake.lock": "nix",
-    }
-    for lockfile, tool in lockfiles.items():
+    for lockfile, tool in LOCKFILES.items():
         if (repo / lockfile).exists():
             detected[f"{tool} (locked)"] = True
 
@@ -149,6 +129,7 @@ def detect_tooling(repo_path: str) -> Dict:
             break
 
     return detected
+
 
 def get_project_metadata(repo_path: str) -> Dict:
     """Extract project metadata from common files."""

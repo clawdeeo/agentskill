@@ -32,6 +32,7 @@ def extract_commands(repo_path: str) -> Dict:
 
     return {k: v for k, v in commands.items() if v}
 
+
 def _extract_from_package_json(repo: Path, commands: Dict):
     """Extract scripts from package.json."""
     pkg = repo / "package.json"
@@ -64,6 +65,7 @@ def _extract_from_package_json(repo: Path, commands: Dict):
     except Exception:
         pass
 
+
 def _extract_from_makefile(repo: Path, commands: Dict):
     """Extract targets from Makefile."""
     makefile = repo / "Makefile"
@@ -95,6 +97,7 @@ def _extract_from_makefile(repo: Path, commands: Dict):
                     })
     except Exception:
         pass
+
 
 def _extract_from_justfile(repo: Path, commands: Dict):
     """Extract recipes from justfile."""
@@ -129,6 +132,7 @@ def _extract_from_justfile(repo: Path, commands: Dict):
     except Exception:
         pass
 
+
 def _extract_from_cargo(repo: Path, commands: Dict):
     """Extract commands from Cargo.toml metadata."""
     cargo = repo / "Cargo.toml"
@@ -140,16 +144,19 @@ def _extract_from_cargo(repo: Path, commands: Dict):
         "command": "cargo build",
         "source": "Cargo.toml",
     })
+
     commands["test"].append({
         "name": "test",
         "command": "cargo test",
         "source": "Cargo.toml",
     })
+
     commands["lint"].append({
         "name": "clippy",
         "command": "cargo clippy",
         "source": "Cargo.toml",
     })
+
     commands["format"].append({
         "name": "fmt",
         "command": "cargo fmt",
@@ -166,6 +173,7 @@ def _extract_from_cargo(repo: Path, commands: Dict):
             })
     except Exception:
         pass
+
 
 def _extract_from_pyproject(repo: Path, commands: Dict):
     """Extract commands from pyproject.toml."""
@@ -212,6 +220,7 @@ def _extract_from_pyproject(repo: Path, commands: Dict):
     except Exception:
         pass
 
+
 def _extract_from_setup_py(repo: Path, commands: Dict):
     """Extract install/test commands from setup.py."""
     setup_py = repo / "setup.py"
@@ -223,6 +232,7 @@ def _extract_from_setup_py(repo: Path, commands: Dict):
         "command": "pip install -e .",
         "source": "setup.py",
     })
+
     commands["install"].append({
         "name": "setup.py install",
         "command": "python setup.py install",
@@ -239,6 +249,7 @@ def _extract_from_setup_py(repo: Path, commands: Dict):
             })
     except Exception:
         pass
+
 
 def _extract_from_requirements(repo: Path, commands: Dict):
     """Extract install command from requirements.txt."""
@@ -258,6 +269,7 @@ def _extract_from_requirements(repo: Path, commands: Dict):
             "command": "pip install -r requirements-dev.txt",
             "source": "requirements-dev.txt",
         })
+
 
 def _extract_from_tox(repo: Path, commands: Dict):
     """Extract test environments from tox.ini."""
@@ -282,6 +294,7 @@ def _extract_from_tox(repo: Path, commands: Dict):
             })
     except Exception:
         pass
+
 
 def _extract_from_scripts(repo: Path, commands: Dict):
     """Extract CLI entry points from scripts/ folder and setup.py console_scripts."""
@@ -311,6 +324,7 @@ def _extract_from_scripts(repo: Path, commands: Dict):
         except Exception:
             pass
 
+
 def _extract_from_docker(repo: Path, commands: Dict):
     """Extract Docker-related commands."""
     if (repo / "Dockerfile").exists():
@@ -327,6 +341,7 @@ def _extract_from_docker(repo: Path, commands: Dict):
             "command": f"docker-compose -f {compose_file} up",
             "source": compose_file,
         })
+
 
 def _extract_from_github_actions(repo: Path, commands: Dict):
     """Extract CI commands from GitHub Actions workflows."""

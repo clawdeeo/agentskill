@@ -12,7 +12,7 @@ FILE_NAMING_PATTERNS = {
 }
 
 SOURCE_DIRS = {
-    "src", "lib", "app", "pkg", "cmd", "internal", "cmd",
+    "src", "lib", "app", "pkg", "cmd", "internal",
     "core", "engine", "domain", "infra", "api",
 }
 
@@ -25,7 +25,7 @@ CONFIG_DIRS = {
 }
 
 DOC_DIRS = {
-    "docs", "doc", "documentation", "examples", "examples",
+    "docs", "doc", "documentation", "examples",
 }
 
 SCRIPT_DIRS = {
@@ -35,6 +35,7 @@ SCRIPT_DIRS = {
 ASSET_DIRS = {
     "assets", "static", "public", "resources", "templates",
 }
+
 
 def extract_repo_structure(repo_path: str) -> Dict:
     """Extract repository directory structure and conventions."""
@@ -60,6 +61,7 @@ def extract_repo_structure(repo_path: str) -> Dict:
 
     return result
 
+
 def _scan_structure(repo: Path, current: Path, depth: int, max_depth: int) -> Dict:
     """Recursively scan directory structure."""
     if depth > max_depth:
@@ -81,6 +83,7 @@ def _scan_structure(repo: Path, current: Path, depth: int, max_depth: int) -> Di
         result[d.name] = _scan_structure(repo, d, depth + 1, max_depth)
 
     return result
+
 
 def _analyze_file_naming(repo: Path) -> Dict:
     """Analyze file naming conventions across the repo."""
@@ -112,6 +115,7 @@ def _analyze_file_naming(repo: Path) -> Dict:
                     style_counts[style] += 1
                     matched = True
                     break
+
             if not matched:
                 style_counts["mixed"] = style_counts.get("mixed", 0) + 1
             total += 1
@@ -127,6 +131,7 @@ def _analyze_file_naming(repo: Path) -> Dict:
         "total": total,
         "extensions": dict(sorted(extensions.items(), key=lambda x: -x[1])[:10]),
     }
+
 
 def _analyze_test_patterns(repo: Path, structure: Dict) -> Dict:
     """Detect test organization and patterns."""
@@ -191,9 +196,11 @@ def _analyze_test_patterns(repo: Path, structure: Dict) -> Dict:
     for marker, framework in framework_markers.items():
         if (repo / marker).exists():
             frameworks.append(framework)
+
     result["test_framework"] = frameworks
 
     return result
+
 
 def _analyze_module_patterns(repo: Path, structure: Dict) -> Dict:
     """Detect module organization patterns."""
@@ -230,6 +237,7 @@ def _analyze_module_patterns(repo: Path, structure: Dict) -> Dict:
                 result["config_dirs"].append(d.name)
 
     return result
+
 
 def _analyze_depth(repo: Path) -> Dict:
     """Analyze directory depth distribution."""

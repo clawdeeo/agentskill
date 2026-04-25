@@ -1,9 +1,11 @@
 """Git extraction utilities."""
 
+import re
 import subprocess
 from typing import Dict, List
 
 from ..constants import COMMIT_LOG_LIMIT, GIT_TIMEOUT, REMOTE_PREFIX, TOP_BRANCH_PREFIXES, TOP_COMMIT_PREFIXES
+
 
 def run_git_log(repo_path: str) -> str:
     """Run git log and return output."""
@@ -13,9 +15,9 @@ def run_git_log(repo_path: str) -> str:
     )
     return result.stdout if result.returncode == 0 else ""
 
+
 def extract_commit_prefixes(commits: List[str]) -> Dict[str, int]:
     """Extract conventional commit prefixes from commit messages."""
-    import re
     prefixes = {}
     for commit in commits:
         match = re.match(r'^(\[?\w+\]?)(?:\(|:)', commit.lower())
@@ -23,6 +25,7 @@ def extract_commit_prefixes(commits: List[str]) -> Dict[str, int]:
             prefix = match.group(1).strip('[]')
             prefixes[prefix] = prefixes.get(prefix, 0) + 1
     return prefixes
+
 
 def analyze_git_commits(repo_path: str) -> Dict:
     """Analyze git commit patterns."""
@@ -44,6 +47,7 @@ def analyze_git_commits(repo_path: str) -> Dict:
     except Exception:
         return {"count": 0, "avg_length": 0, "common_prefixes": {}}
 
+
 def run_git_branch(repo_path: str) -> str:
     """Run git branch and return output."""
     result = subprocess.run(
@@ -51,6 +55,7 @@ def run_git_branch(repo_path: str) -> str:
         capture_output=True, text=True, timeout=GIT_TIMEOUT
     )
     return result.stdout if result.returncode == 0 else ""
+
 
 def extract_branch_prefixes(branches: List[str]) -> Dict[str, int]:
     """Extract branch naming prefixes."""
@@ -64,6 +69,7 @@ def extract_branch_prefixes(branches: List[str]) -> Dict[str, int]:
             prefix = parts[0]
             prefixes[prefix] = prefixes.get(prefix, 0) + 1
     return prefixes
+
 
 def analyze_branches(repo_path: str) -> Dict:
     """Analyze branch naming patterns."""
@@ -80,6 +86,7 @@ def analyze_branches(repo_path: str) -> Dict:
         }
     except Exception:
         return {"count": 0, "common_prefixes": {}}
+
 
 def analyze_git_config(repo_path: str) -> Dict:
     """Extract git configuration hints."""
@@ -99,6 +106,7 @@ def analyze_git_config(repo_path: str) -> Dict:
         }
     except Exception:
         return {}
+
 
 def get_remote_info(repo_path: str) -> Dict:
     """Extract remote repository info."""

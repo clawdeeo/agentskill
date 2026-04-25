@@ -1,6 +1,5 @@
 """Constants for style detection and analysis."""
 
-
 SAMPLE_SIZE_SMALL = 30
 SAMPLE_SIZE_MEDIUM = 50
 COMMIT_LOG_LIMIT = 100
@@ -13,6 +12,20 @@ JSON_INDENT = 2
 HIDDEN_PREFIX = "."
 GIT_DIR = ".git"
 REMOTE_PREFIX = "remotes/origin/"
+
+LOCKFILES = {
+    "Cargo.lock": "cargo",
+    "package-lock.json": "npm",
+    "yarn.lock": "yarn",
+    "pnpm-lock.yaml": "pnpm",
+    "poetry.lock": "poetry",
+    "Pipfile.lock": "pipenv",
+    "go.sum": "go",
+    "Gemfile.lock": "bundler",
+    "composer.lock": "composer",
+    "mix.lock": "mix",
+    "flake.lock": "nix",
+}
 
 EXTENSIONS = {
     "rust": [".rs"],
