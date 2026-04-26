@@ -1,10 +1,16 @@
+import subprocess
+
 from commands import git as git_command
 from commands.git import (
+    _analyze_bodies,
+    _analyze_branches,
     _analyze_subjects,
     _detect_merge_strategy,
     _parse_commit_subject,
+    _run,
     analyze,
 )
+from lib.logging_utils import get_logger
 from test_support import create_sample_repo, git, init_git_repo, make_commit
 
 
@@ -49,20 +55,20 @@ def test_parse_commit_subject_and_subject_analysis():
 
 
 def test_detect_merge_strategy_paths(monkeypatch):
-    monkeypatch.setattr(git_command, "_run", lambda cmd, cwd: (1, ""))
+    monkeypatch.setattr(git_command, "_run", lambda cmd, cwd: (1, "", "bad merge log"))
     assert _detect_merge_strategy("repo") == ("unknown", "insufficient data")
 
-    monkeypatch.setattr(git_command, "_run", lambda cmd, cwd: (0, ""))
+    monkeypatch.setattr(git_command, "_run", lambda cmd, cwd: (0, "", ""))
     assert _detect_merge_strategy("repo") == ("rebase", "no merge commits in history")
 
-    monkeypatch.setattr(git_command, "_run", lambda cmd, cwd: (0, "a\nb\n"))
+    monkeypatch.setattr(git_command, "_run", lambda cmd, cwd: (0, "a\nb\n", ""))
 
     assert _detect_merge_strategy("repo") == (
         "squash",
         "merge commits have single parent",
     )
 
-    monkeypatch.setattr(git_command, "_run", lambda cmd, cwd: (0, "a b\nc d\n"))
+    monkeypatch.setattr(git_command, "_run", lambda cmd, cwd: (0, "a b\nc d\n", ""))
 
     assert _detect_merge_strategy("repo") == (
         "merge",
@@ -98,8 +104,9 @@ def test_git_analyze_can_report_empty_history(monkeypatch, tmp_path):
 
     def fake_run(cmd, cwd):
         if "--format=%H|%s|%ae|%G?" in cmd:
-            return 0, ""
-        return 0, ""
+            return 0, "", ""
+
+        return 0, "", ""
 
     monkeypatch.setattr(git_command, "_run", fake_run)
     result = analyze(str(repo))
@@ -114,3 +121,84 @@ def test_git_reports_invalid_repo_paths(tmp_path):
         "error": f"path does not exist: {missing}",
         "script": "git",
     }
+
+
+def test_git_run_preserves_stdout_and_stderr(monkeypatch):
+    class Completed:
+        returncode = 2
+        stdout = "out"
+        stderr = "err"
+
+    monkeypatch.setattr(
+        git_command.subprocess, "run", lambda *args, **kwargs: Completed()
+    )
+
+    assert _run(["git", "status"], "repo") == (2, "out", "err")
+
+
+def test_git_run_handles_timeout_and_generic_exception(monkeypatch):
+    def timeout_run(*args, **kwargs):
+        raise subprocess.TimeoutExpired("git", git_command.GIT_TIMEOUT)
+
+    monkeypatch.setattr(git_command.subprocess, "run", timeout_run)
+
+    assert _run(["git", "status"], "repo") == (
+        1,
+        "",
+        f"git command timed out after {git_command.GIT_TIMEOUT}s",
+    )
+
+    def broken_run(*args, **kwargs):
+        raise RuntimeError("missing git")
+
+    monkeypatch.setattr(git_command.subprocess, "run", broken_run)
+
+    assert _run(["git", "status"], "repo") == (1, "", "missing git")
+
+
+def test_git_analyze_logs_fatal_git_log_failures(monkeypatch, caplog):
+    monkeypatch.setattr(
+        git_command,
+        "_run",
+        lambda cmd, cwd: (1, "", "fatal: not a git repository"),
+    )
+
+    logger = get_logger()
+    original_propagate = logger.propagate
+    logger.propagate = True
+
+    try:
+        with caplog.at_level("WARNING", logger="agentskill"):
+            result = analyze(".")
+    finally:
+        logger.propagate = original_propagate
+
+    assert result == {"error": "git log failed", "script": "git"}
+    assert "fatal: not a git repository" in caplog.text
+    assert "Git command failed" in caplog.text
+
+
+def test_git_helper_failures_log_and_degrade(monkeypatch, caplog):
+    monkeypatch.setattr(
+        git_command,
+        "_run",
+        lambda cmd, cwd: (1, "", "fatal helper failure"),
+    )
+
+    logger = get_logger()
+    original_propagate = logger.propagate
+    logger.propagate = True
+
+    try:
+        with caplog.at_level("WARNING", logger="agentskill"):
+            body_count = _analyze_bodies("repo")
+            branches = _analyze_branches("repo")
+            merge = _detect_merge_strategy("repo")
+    finally:
+        logger.propagate = original_propagate
+
+    assert body_count == 0
+    assert branches == ({}, 0, [])
+    assert merge == ("unknown", "insufficient data")
+    assert caplog.text.count("Git command failed") >= 3
+    assert "fatal helper failure" in caplog.text

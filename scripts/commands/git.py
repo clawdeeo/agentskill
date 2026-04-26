@@ -13,6 +13,7 @@ import subprocess
 import sys
 
 from common.fs import validate_repo
+from lib.logging_utils import get_logger
 from lib.output import run_and_output
 
 GIT_TIMEOUT = 30
@@ -24,9 +25,10 @@ SQUASH_PARENT_THRESHOLD = 1.2
 TRUNK_BRANCH_NAMES = {"main", "master", "develop", "dev"}
 
 CONVENTIONAL_PREFIX_RE = re.compile(r"^([a-z][a-z0-9_-]*)(\([^)]+\))?(!)?\s*:\s*(.+)$")
+logger = get_logger()
 
 
-def _run(cmd: list[str], cwd: str) -> tuple[int, str]:
+def _run(cmd: list[str], cwd: str) -> tuple[int, str, str]:
     try:
         r = subprocess.run(
             cmd,
@@ -36,9 +38,11 @@ def _run(cmd: list[str], cwd: str) -> tuple[int, str]:
             timeout=GIT_TIMEOUT,
         )
 
-        return r.returncode, r.stdout
-    except Exception:
-        return 1, ""
+        return r.returncode, r.stdout, r.stderr
+    except subprocess.TimeoutExpired:
+        return 1, "", f"git command timed out after {GIT_TIMEOUT}s"
+    except Exception as exc:
+        return 1, "", str(exc)
 
 
 def _parse_commit_subject(subject: str) -> tuple[str | None, str | None, bool]:
@@ -114,9 +118,18 @@ def _analyze_subjects(
 
 def _analyze_bodies(cwd: str) -> int:
     """Return count of commits that have a body."""
-    rc, out = _run(["git", "log", "--format=%H|%b", "--no-merges"], cwd)
+    cmd = ["git", "log", "--format=%H|%b", "--no-merges"]
+    rc, out, err = _run(cmd, cwd)
 
     if rc != 0:
+        logger.warning(
+            "Git command failed: cmd=%s cwd=%s returncode=%s stderr=%s",
+            cmd,
+            cwd,
+            rc,
+            err.strip(),
+        )
+
         return 0
 
     body_hashes: set[str] = set()
@@ -142,12 +155,21 @@ def _analyze_bodies(cwd: str) -> int:
 
 def _analyze_branches(cwd: str) -> tuple[dict[str, int], int, list[str]]:
     """Return (branch_prefixes, active_count, examples)."""
-    rc, out = _run(["git", "branch", "-a"], cwd)
+    cmd = ["git", "branch", "-a"]
+    rc, out, err = _run(cmd, cwd)
     branch_prefixes: dict[str, int] = {}
     active_count = 0
     examples: list[str] = []
 
     if rc != 0:
+        logger.warning(
+            "Git command failed: cmd=%s cwd=%s returncode=%s stderr=%s",
+            cmd,
+            cwd,
+            rc,
+            err.strip(),
+        )
+
         return branch_prefixes, active_count, examples
 
     for line in out.splitlines():
@@ -170,12 +192,18 @@ def _analyze_branches(cwd: str) -> tuple[dict[str, int], int, list[str]]:
 
 def _detect_merge_strategy(cwd: str) -> tuple[str, str]:
     """Return (strategy, evidence)."""
-    rc, out = _run(
-        ["git", "log", "--merges", "--format=%P", f"-{MERGE_COMMITS_SAMPLE}"],
-        cwd,
-    )
+    cmd = ["git", "log", "--merges", "--format=%P", f"-{MERGE_COMMITS_SAMPLE}"]
+    rc, out, err = _run(cmd, cwd)
 
     if rc != 0:
+        logger.warning(
+            "Git command failed: cmd=%s cwd=%s returncode=%s stderr=%s",
+            cmd,
+            cwd,
+            rc,
+            err.strip(),
+        )
+
         return "unknown", "insufficient data"
 
     merge_lines = [line.strip() for line in out.splitlines() if line.strip()]
@@ -203,12 +231,18 @@ def analyze(repo_path: str) -> dict:
 
     cwd = str(repo)
 
-    rc, out = _run(
-        ["git", "log", "--format=%H|%s|%ae|%G?", "--no-merges"],
-        cwd,
-    )
+    cmd = ["git", "log", "--format=%H|%s|%ae|%G?", "--no-merges"]
+    rc, out, err = _run(cmd, cwd)
 
     if rc != 0:
+        logger.warning(
+            "Git command failed: cmd=%s cwd=%s returncode=%s stderr=%s",
+            cmd,
+            cwd,
+            rc,
+            err.strip(),
+        )
+
         return {"error": "git log failed", "script": "git"}
 
     (
