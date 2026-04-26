@@ -1,6 +1,7 @@
 """Aggregate analyzer execution for the top-level CLI."""
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+from time import monotonic
 
 from commands import config as config_command
 from commands import git as git_command
@@ -41,6 +42,9 @@ COMMANDS: dict[str, dict] = {
     },
 }
 
+ANALYZER_TIMEOUT_SECONDS = 60
+POLL_INTERVAL_SECONDS = 0.1
+
 
 def _command_kwargs(command_name: str, lang_filter: str | None) -> dict:
     if COMMANDS[command_name]["supports_lang"]:
@@ -55,22 +59,52 @@ def run_all(repo: str, lang_filter: str | None = None) -> dict:
         for name, metadata in COMMANDS.items()
     }
     result: dict = {}
+    executor = ThreadPoolExecutor(max_workers=len(tasks))
 
-    with ThreadPoolExecutor(max_workers=len(tasks)) as executor:
+    try:
         futures = {
             executor.submit(command_fn, repo, **kwargs): name
             for name, (command_fn, kwargs) in tasks.items()
         }
+        start_times = {future: monotonic() for future in futures}
+        pending = set(futures)
 
-        for future in as_completed(futures):
-            name = futures[future]
+        while pending:
+            done, not_done = wait(
+                pending,
+                timeout=POLL_INTERVAL_SECONDS,
+                return_when=FIRST_COMPLETED,
+            )
 
-            try:
-                result[name] = future.result()
-            except Exception as exc:
-                result[name] = {"error": str(exc)}
+            for future in done:
+                name = futures[future]
 
-    return result
+                try:
+                    result[name] = future.result()
+                except Exception as exc:
+                    result[name] = {"error": str(exc)}
+
+                pending.remove(future)
+
+            now = monotonic()
+            timed_out = {
+                future
+                for future in not_done
+                if now - start_times[future] >= ANALYZER_TIMEOUT_SECONDS
+            }
+
+            for future in timed_out:
+                name = futures[future]
+                result[name] = {
+                    "error": (f"analyzer timed out after {ANALYZER_TIMEOUT_SECONDS}s")
+                }
+
+                future.cancel()
+                pending.remove(future)
+
+        return result
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
 
 
 def run_many(repos: list[str], lang_filter: str | None = None) -> dict:
