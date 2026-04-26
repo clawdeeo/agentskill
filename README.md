@@ -42,6 +42,12 @@ For local development:
 python -m pip install -e '.[dev]'
 ```
 
+To enable the commit-time checks after installing the dev environment:
+
+```bash
+pre-commit install
+```
+
 ---
 
 ## Development Checks
@@ -63,6 +69,16 @@ ruff check .
 mypy
 pytest
 ```
+
+To run the commit-time hooks across the full repository:
+
+```bash
+pre-commit run --all-files
+```
+
+The pre-commit setup runs Ruff formatting, Ruff linting, and mypy before each
+commit. Full `pytest` runs remain part of normal local verification and CI,
+rather than a default commit-time hook.
 
 ---
 
