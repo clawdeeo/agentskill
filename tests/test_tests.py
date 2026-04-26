@@ -26,7 +26,6 @@ def test_tests_detect_frameworks_run_command_and_conftest(tmp_path):
             "Makefile": "test:\n\tpython -m pytest -q\n",
             "pkg/mod.py": "def run():\n    return 1\n",
             "tests/test_mod.py": "def test_run():\n    assert True\n",
-
             "tests/conftest.py": (
                 "import pytest\n\n@pytest.fixture\ndef repo_fixture():\n    return 1\n"
             ),

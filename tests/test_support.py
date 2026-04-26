@@ -52,17 +52,13 @@ def create_sample_repo(tmp_path: Path) -> Path:
                 "[tool.ruff]\n"
                 "line-length = 88\n"
             ),
-
             ".editorconfig": (
                 "root = true\n\n[*.py]\nindent_style = space\nindent_size = 4\n"
             ),
-
             "pkg/__init__.py": "\n",
-
             "pkg/util.py": (
                 "VALUE_NAME = 1\n\n\ndef helper_value():\n    return VALUE_NAME\n"
             ),
-
             "pkg/main.py": (
                 "from pkg.util import helper_value\n\n\n"
                 "class SampleThing:\n"
@@ -71,7 +67,6 @@ def create_sample_repo(tmp_path: Path) -> Path:
                 "def main_entry():\n"
                 "    return SampleThing().run_task()\n"
             ),
-
             "tests/test_main.py": (
                 "import pytest\n\n"
                 "from pkg.main import main_entry\n\n\n"

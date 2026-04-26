@@ -66,7 +66,7 @@ def _parse_toml_value(s: str):
     try:
         if "." in s:
             return float(s)
-    
+
         return int(s)
     except ValueError:
         return s

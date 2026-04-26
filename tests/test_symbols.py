@@ -41,7 +41,6 @@ def test_symbols_extracts_typescript_and_go(tmp_path):
                 "export type WidgetType = string\n"
                 "export const VALUE_NAME = 1\n"
             ),
-
             "pkg/main.go": (
                 "package main\n"
                 "type Worker struct{}\n"
