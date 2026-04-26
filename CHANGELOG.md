@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-04-26
+
+### Added
+
+- Logging infrastructure — `scripts/lib/logging_utils.py` with configurable log level and exception capture
+- Output path validation — `--out` paths are validated; parent directories are created automatically
+- Per-analyzer timeout logging — runner logs when an analyzer exceeds its deadline
+- `write_output` exception handling — captures and logs JSON serialization errors
+
+### Changed
+
+- `_run` in `git.py` now returns stderr alongside stdout, and logs command failures
+- `run_all` logs per-analyzer failures with tracebacks instead of silently swallowing them
+
 ## [0.2.0] - 2026-04-26
 
 ### Added
