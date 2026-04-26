@@ -18,6 +18,9 @@ dev = [
 [project.scripts]
 agentskill = "cli:main"
 
+[tool.setuptools]
+py-modules = ["cli"]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["scripts*"]

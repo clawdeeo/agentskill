@@ -1,4 +1,6 @@
 import json
+import tomllib
+from pathlib import Path
 
 from test_support import create_sample_repo
 
@@ -47,3 +49,10 @@ def test_cli_writes_out_file_and_multi_repo_results(tmp_path):
 
     payload = json.loads(out_file.read_text())
     assert set(payload) == {str(repo_one), str(repo_two)}
+
+
+def test_pyproject_includes_cli_module_for_console_script():
+    with Path("pyproject.toml").open("rb") as f:
+        data = tomllib.load(f)
+
+    assert data["tool"]["setuptools"]["py-modules"] == ["cli"]
