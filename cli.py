@@ -24,6 +24,7 @@ from pathlib import Path
 _HERE = Path(__file__).parent
 sys.path.insert(0, str(_HERE / "scripts"))
 
+from lib.logging_utils import configure_logging
 from lib.output import run_and_output, write_output
 from lib.runner import COMMANDS, run_many
 
@@ -52,14 +53,18 @@ def _single_script_cmd(command_name: str, args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    configure_logging()
+
     parser = argparse.ArgumentParser(
         prog="agentskill",
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
+
     parser.add_argument(
         "--pretty", action="store_true", help="Pretty-print JSON output"
     )
+
     parser.add_argument(
         "--out", metavar="FILE", help="Write output to file instead of stdout"
     )
@@ -67,9 +72,11 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_analyze = sub.add_parser("analyze", help="Run all scripts and merge output")
+
     p_analyze.add_argument(
         "repos", nargs="+", metavar="repo", help="Path(s) to repository"
     )
+
     p_analyze.add_argument(
         "--lang", help="Filter to a single language where applicable"
     )
@@ -95,12 +102,14 @@ def main(argv: list[str] | None = None) -> int:
     p_symbols = sub.add_parser(
         "symbols", help="Symbol name extraction and pattern clustering"
     )
+
     p_symbols.add_argument("repo", help="Path to repository")
     p_symbols.add_argument("--lang", help="Filter to a single language")
 
     p_tests = sub.add_parser(
         "tests", help="Test-to-source mapping and framework detection"
     )
+
     p_tests.add_argument("repo", help="Path to repository")
 
     for p in [
