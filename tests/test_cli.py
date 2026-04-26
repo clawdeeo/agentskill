@@ -1,7 +1,11 @@
 import json
 from pathlib import Path
 
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
+
 from test_support import create_sample_repo
 
 import cli
