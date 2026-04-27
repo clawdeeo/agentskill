@@ -2,10 +2,10 @@ from commands.config import (
     _parse_editorconfig,
     _parse_editorconfig_for_lang,
     _parse_ini_section,
-    _parse_toml,
     _parse_yaml_simple,
     detect,
 )
+from lib.parsers import load_toml_safe
 from test_support import create_repo, create_sample_repo
 
 
@@ -19,7 +19,7 @@ def test_config_detects_python_tooling(tmp_path):
 
 
 def test_config_parsers_cover_toml_yaml_ini_and_editorconfig(tmp_path):
-    parsed_toml = _parse_toml(
+    parsed_toml = load_toml_safe(
         '[tool.demo]\nenabled = true\nnames = [\n  "a",\n  "b",\n]\n'
     )
 

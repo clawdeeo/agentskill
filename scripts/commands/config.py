@@ -18,6 +18,7 @@ from typing import Any
 
 from common.fs import validate_repo
 from lib.output import run_and_output
+from lib.parsers import load_toml_safe
 
 MAX_CONFIG_READ_BYTES = 32_000
 
@@ -42,125 +43,6 @@ ESLINT_CONFIG_FILES = [
     "eslint.config.mjs",
     "eslint.config.cjs",
 ]
-
-
-def _parse_toml_value(s: str):
-    s = s.strip()
-
-    if not s:
-        return None
-
-    if s.startswith('"') or s.startswith("'"):
-        q = s[0]
-        return s.strip(q)
-
-    if s.lower() == "true":
-        return True
-
-    if s.lower() == "false":
-        return False
-
-    if s.startswith("["):
-        inner = s[1 : s.rfind("]")]
-        items = [_parse_toml_value(x.strip()) for x in _split_toml_array(inner)]
-        return [i for i in items if i is not None or i == ""]
-
-    try:
-        if "." in s:
-            return float(s)
-
-        return int(s)
-    except ValueError:
-        return s
-
-
-def _split_toml_array(s: str) -> list[str]:
-    items = []
-    depth = 0
-    current = []
-
-    for ch in s:
-        if ch in "([{":
-            depth += 1
-            current.append(ch)
-        elif ch in ")]}":
-            depth -= 1
-            current.append(ch)
-        elif ch == "," and depth == 0:
-            items.append("".join(current).strip())
-            current = []
-        else:
-            current.append(ch)
-
-    if current:
-        items.append("".join(current).strip())
-
-    return [i for i in items if i]
-
-
-def _parse_toml(content: str) -> dict[str, Any]:
-    result: dict[str, Any] = {}
-    current_section: list[str] = []
-    lines = content.splitlines()
-    i = 0
-
-    while i < len(lines):
-        line = lines[i]
-        stripped = line.strip()
-
-        if not stripped or stripped.startswith("#"):
-            i += 1
-            continue
-
-        if stripped.startswith("[["):
-            m = re.match(r"^\[\[([^\]]+)\]\]", stripped)
-
-            if m:
-                current_section = m.group(1).split(".")
-
-            i += 1
-            continue
-
-        if stripped.startswith("["):
-            m = re.match(r"^\[([^\]]+)\]", stripped)
-
-            if m:
-                current_section = m.group(1).split(".")
-
-            i += 1
-            continue
-
-        if "=" in stripped and not stripped.startswith("#"):
-            key, _, rest = stripped.partition("=")
-            key = key.strip()
-            rest = rest.strip()
-
-            if rest.startswith("[") and "]" not in rest:
-                parts = [rest]
-                i += 1
-
-                while i < len(lines):
-                    part = lines[i].strip()
-                    parts.append(part)
-
-                    if "]" in part:
-                        break
-
-                    i += 1
-
-                rest = " ".join(parts)
-
-            value = _parse_toml_value(rest)
-            node = result
-
-            for part in current_section:
-                node = node.setdefault(part, {})
-
-            node[key] = value
-
-        i += 1
-
-    return result
 
 
 def _get_nested(d: Any, *keys: str) -> Any | None:
@@ -249,7 +131,7 @@ def _parse_by_extension(raw: str, fname: str) -> dict:
         return _parse_yaml_simple(raw)
 
     if fname.endswith(".toml"):
-        return _parse_toml(raw)
+        return load_toml_safe(raw)
 
     return {}
 
@@ -356,7 +238,7 @@ def _detect_python_formatter(repo: Path, toml_data: dict) -> dict | None:
                 settings.setdefault(key, ruff_top[key])
 
         if ruff_toml.exists():
-            extra = _parse_toml(_read(ruff_toml))
+            extra = load_toml_safe(_read(ruff_toml))
             settings.update(extra.get("format", {}))
 
             if "line-length" in extra:
@@ -374,7 +256,7 @@ def _detect_python_formatter(repo: Path, toml_data: dict) -> dict | None:
         return {
             "name": "black",
             "config_file": "black.toml",
-            "settings": _parse_toml(_read(black_toml)),
+            "settings": load_toml_safe(_read(black_toml)),
         }
 
     return None
@@ -562,7 +444,7 @@ def _detect_rust(repo: Path) -> dict:
             result["formatter"] = {
                 "name": "rustfmt",
                 "config_file": fname,
-                "settings": _parse_toml(_read(fp)),
+                "settings": load_toml_safe(_read(fp)),
             }
 
             break
@@ -573,7 +455,7 @@ def _detect_rust(repo: Path) -> dict:
         result["linter"] = {
             "name": "clippy",
             "config_file": "clippy.toml",
-            "settings": _parse_toml(_read(clippy)),
+            "settings": load_toml_safe(_read(clippy)),
         }
 
     return result
@@ -597,7 +479,7 @@ def detect(repo_path: str) -> dict:
     pyproject = repo / "pyproject.toml"
 
     if pyproject.exists():
-        toml_data = _parse_toml(_read(pyproject))
+        toml_data = load_toml_safe(_read(pyproject))
 
     ec_sections: dict = {}
     ec = repo / ".editorconfig"
