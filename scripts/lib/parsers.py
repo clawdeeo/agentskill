@@ -56,6 +56,15 @@ def load_toml(content: str) -> dict[str, Any]:
     return mod.loads(content)
 
 
+def load_toml_safe(content: str) -> dict[str, Any]:
+    """Parse a TOML document, returning {} on any error."""
+    try:
+        data = load_toml(content)
+        return data if isinstance(data, dict) else {}
+    except (ParserUnavailableError, Exception):
+        return {}
+
+
 _yaml_module = None
 _yaml_checked = False
 
