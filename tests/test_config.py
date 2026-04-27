@@ -161,7 +161,7 @@ def test_config_parses_real_yaml_configs():
     assert prettier_data["semi"] is False
     assert prettier_data["tabWidth"] == 2
 
-    assert eslint_data["rules"]["semi"] is False  # YAML "off" is boolean False
+    assert eslint_data["rules"]["semi"] is False
     assert eslint_data["rules"]["indent"][1] == 2
 
     assert golangci_data["run"]["timeout"] == "2m"
