@@ -1,10 +1,14 @@
 """Reference repository data models for 0.5.0 reference loading."""
 
 from dataclasses import dataclass, field
+from pathlib import Path
+
+from common.fs import read_text
 
 REFERENCE_KIND_LOCAL = "local"
 REFERENCE_KIND_REMOTE = "remote"
 SUPPORTED_REFERENCE_KINDS = {REFERENCE_KIND_LOCAL, REFERENCE_KIND_REMOTE}
+REFERENCE_AGENTS_FILENAME = "AGENTS.md"
 
 
 @dataclass(frozen=True)
@@ -94,3 +98,59 @@ class ReferenceMetadata:
             "agentskill_version": self.agentskill_version,
             "references": list(self.sources),
         }
+
+
+def load_local_reference(source: ReferenceSource) -> ReferenceLoadResult:
+    if source.kind != REFERENCE_KIND_LOCAL:
+        return ReferenceLoadResult(
+            source=source,
+            error=f"unsupported local reference source kind: {source.kind}",
+        )
+
+    root = Path(source.value)
+
+    if not root.exists():
+        return ReferenceLoadResult(
+            source=source,
+            error=f"reference path does not exist: {source.value}",
+        )
+
+    if not root.is_dir():
+        return ReferenceLoadResult(
+            source=source,
+            error=f"reference path is not a directory: {source.value}",
+        )
+
+    agents_path = root / REFERENCE_AGENTS_FILENAME
+
+    if not agents_path.exists():
+        return ReferenceLoadResult(
+            source=source,
+            error=f"AGENTS.md not found in reference repository: {source.value}",
+        )
+
+    content = read_text(agents_path)
+
+    if not content:
+        return ReferenceLoadResult(
+            source=source,
+            error=f"AGENTS.md is empty in reference repository: {source.value}",
+        )
+
+    if not content.strip():
+        return ReferenceLoadResult(
+            source=source,
+            error=f"AGENTS.md is empty in reference repository: {source.value}",
+        )
+
+    doc = ReferenceDocument(
+        source=source,
+        content=content,
+        source_path=REFERENCE_AGENTS_FILENAME,
+    )
+
+    return ReferenceLoadResult(source=source, document=doc)
+
+
+def load_local_references(sources: list[ReferenceSource]) -> list[ReferenceLoadResult]:
+    return [load_local_reference(s) for s in sources]

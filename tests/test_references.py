@@ -3,6 +3,8 @@ from lib.references import (
     ReferenceLoadResult,
     ReferenceMetadata,
     ReferenceSource,
+    load_local_reference,
+    load_local_references,
 )
 
 
@@ -161,3 +163,107 @@ def test_reference_metadata_omits_absent_optional_fields():
     meta = ReferenceMetadata(agentskill_version="0.5.0")
     d = meta.to_dict()
     assert d["references"] == []
+
+
+def test_load_local_reference_success(tmp_path):
+    repo = tmp_path / "my-repo"
+    repo.mkdir()
+    (repo / "AGENTS.md").write_text("# Rules\n\nBe kind.")
+
+    src = ReferenceSource(kind="local", value=str(repo))
+    result = load_local_reference(src)
+
+    assert result.ok
+    assert result.document is not None
+    assert result.document.content == "# Rules\n\nBe kind."
+    assert result.document.source_path == "AGENTS.md"
+    assert result.document.source is src
+
+
+def test_load_local_reference_missing_path(tmp_path):
+    missing = tmp_path / "does-not-exist"
+    src = ReferenceSource(kind="local", value=str(missing))
+    result = load_local_reference(src)
+
+    assert not result.ok
+    assert result.document is None
+    assert "does not exist" in result.error
+
+
+def test_load_local_reference_path_is_file(tmp_path):
+    file_path = tmp_path / "not-a-dir"
+    file_path.write_text("hello")
+
+    src = ReferenceSource(kind="local", value=str(file_path))
+    result = load_local_reference(src)
+
+    assert not result.ok
+    assert "not a directory" in result.error
+
+
+def test_load_local_reference_missing_agents_md(tmp_path):
+    repo = tmp_path / "empty-repo"
+    repo.mkdir()
+
+    src = ReferenceSource(kind="local", value=str(repo))
+    result = load_local_reference(src)
+
+    assert not result.ok
+    assert "AGENTS.md not found" in result.error
+
+
+def test_load_local_reference_empty_agents_md(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "AGENTS.md").write_text("")
+
+    src = ReferenceSource(kind="local", value=str(repo))
+    result = load_local_reference(src)
+
+    assert not result.ok
+    assert "empty" in result.error
+
+
+def test_load_local_reference_whitespace_only_agents_md(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "AGENTS.md").write_text("   \n\n  ")
+
+    src = ReferenceSource(kind="local", value=str(repo))
+    result = load_local_reference(src)
+
+    assert not result.ok
+    assert "empty" in result.error
+
+
+def test_load_local_reference_unsupported_kind():
+    src = ReferenceSource(kind="remote", value="https://github.com/org/repo.git")
+    result = load_local_reference(src)
+
+    assert not result.ok
+    assert "unsupported local reference source kind" in result.error
+
+
+def test_load_local_references_batch_preserves_order(tmp_path):
+    repo_a = tmp_path / "repo-a"
+    repo_a.mkdir()
+    (repo_a / "AGENTS.md").write_text("# A\n")
+
+    repo_c = tmp_path / "repo-c"
+    repo_c.mkdir()
+    (repo_c / "AGENTS.md").write_text("# C\n")
+
+    sources = [
+        ReferenceSource(kind="local", value=str(repo_a)),
+        ReferenceSource(kind="local", value=str(tmp_path / "missing")),
+        ReferenceSource(kind="local", value=str(repo_c)),
+    ]
+
+    results = load_local_references(sources)
+
+    assert len(results) == 3
+    assert results[0].ok
+    assert not results[1].ok
+    assert results[2].ok
+    assert results[0].document.content == "# A\n"
+    assert results[2].document.content == "# C\n"
