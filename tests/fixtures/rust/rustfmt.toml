@@ -1,0 +1,8 @@
+max_width = 100
+hard_tabs = false
+tab_spaces = 4
+newline_style = "Unix"
+
+[format]
+imports_granularity = "Crate"
+group_imports = "StdExternalCrate"

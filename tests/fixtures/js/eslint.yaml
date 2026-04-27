@@ -1,0 +1,13 @@
+root: true
+extends:
+  - eslint:recommended
+  - plugin:@typescript-eslint/recommended
+rules:
+  semi: off
+  quotes:
+    - error
+    - single
+  indent:
+    - error
+    - 2
+parser: '@typescript-eslint/parser'

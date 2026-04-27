@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from commands.config import (
     _parse_editorconfig,
     _parse_editorconfig_for_lang,
@@ -133,3 +135,116 @@ def test_config_load_yaml_safe_returns_empty_on_unavailable(monkeypatch):
     monkeypatch.setattr(builtins, "__import__", fake_import)
 
     assert load_yaml_safe("tool:\n  key: value") == {}
+
+
+def test_config_parses_real_toml_config():
+    toml = (
+        Path(__file__).parent / "fixtures" / "python" / "pyproject.toml"
+    ).read_text()
+    data = load_toml_safe(toml)
+
+    assert data["tool"]["ruff"]["line-length"] == 88
+    assert data["tool"]["ruff"]["target-version"] == "py311"
+    assert data["tool"]["black"]["line-length"] == 88
+    assert data["tool"]["mypy"]["python_version"] == "3.11"
+
+
+def test_config_parses_real_yaml_configs():
+    prettier = (Path(__file__).parent / "fixtures" / "js" / "prettier.yaml").read_text()
+    eslint = (Path(__file__).parent / "fixtures" / "js" / "eslint.yaml").read_text()
+    golangci = (Path(__file__).parent / "fixtures" / "go" / "golangci.yml").read_text()
+
+    prettier_data = load_yaml_safe(prettier)
+    eslint_data = load_yaml_safe(eslint)
+    golangci_data = load_yaml_safe(golangci)
+
+    assert prettier_data["semi"] is False
+    assert prettier_data["tabWidth"] == 2
+
+    assert eslint_data["rules"]["semi"] is False  # YAML "off" is boolean False
+    assert eslint_data["rules"]["indent"][1] == 2
+
+    assert golangci_data["run"]["timeout"] == "2m"
+    assert golangci_data["run"]["skip-dirs"] == ["vendor", ".git"]
+
+
+def test_config_parses_rust_toml_configs():
+    rustfmt = (Path(__file__).parent / "fixtures" / "rust" / "rustfmt.toml").read_text()
+    clippy = (Path(__file__).parent / "fixtures" / "rust" / "clippy.toml").read_text()
+
+    rustfmt_data = load_toml_safe(rustfmt)
+    clippy_data = load_toml_safe(clippy)
+
+    assert rustfmt_data["max_width"] == 100
+    assert rustfmt_data["tab_spaces"] == 4
+
+    assert clippy_data["msrv"] == "1.70"
+    assert "clippy::pedantic" in clippy_data["deny"]
+
+
+def test_config_detects_from_fixture_configs(tmp_path):
+    repo = create_repo(
+        tmp_path,
+        {
+            "pyproject.toml": (
+                Path(__file__).parent / "fixtures" / "python" / "pyproject.toml"
+            ).read_text(),
+            ".prettierrc.yaml": (
+                Path(__file__).parent / "fixtures" / "js" / "prettier.yaml"
+            ).read_text(),
+            ".eslintrc.yaml": (
+                Path(__file__).parent / "fixtures" / "js" / "eslint.yaml"
+            ).read_text(),
+            "go.mod": "module example.com/demo\n",
+            ".golangci.yml": (
+                Path(__file__).parent / "fixtures" / "go" / "golangci.yml"
+            ).read_text(),
+            "main.go": "package main\n",
+            "rustfmt.toml": (
+                Path(__file__).parent / "fixtures" / "rust" / "rustfmt.toml"
+            ).read_text(),
+            "clippy.toml": (
+                Path(__file__).parent / "fixtures" / "rust" / "clippy.toml"
+            ).read_text(),
+            "main.rs": "fn main() {}",
+        },
+    )
+
+    result = detect(str(repo))
+
+    assert result["python"]["linter"]["name"] == "ruff"
+    assert result["python"]["formatter"]["name"] == "black"
+    assert result["typescript"]["formatter"]["name"] == "prettier"
+    assert result["typescript"]["linter"]["name"] == "eslint"
+    assert result["go"]["linter"]["name"] == "golangci-lint"
+    assert result["rust"]["formatter"]["name"] == "rustfmt"
+    assert result["rust"]["linter"]["name"] == "clippy"
+
+    assert "E" in result["python"]["linter"]["settings"]["select"]
+    assert result["rust"]["formatter"]["settings"]["max_width"] == 100
+
+
+def test_config_invalid_toml_returns_empty():
+    assert load_toml_safe("[tool.ruff\nline-length = 88") == {}
+
+
+def test_config_invalid_yaml_returns_empty():
+    assert load_yaml_safe("rules:\n - invalid: [") == {}
+
+
+def test_config_mixed_formats_parsed_independently(tmp_path):
+    repo = create_repo(
+        tmp_path,
+        {
+            "pyproject.toml": "[tool.ruff]\nline-length = 88",
+            ".prettierrc.yaml": "semi: false",
+            "go.mod": "module demo\n",
+            "main.go": "package main\n",
+        },
+    )
+
+    result = detect(str(repo))
+
+    assert result["python"]["linter"]["name"] == "ruff"
+    assert result["typescript"]["formatter"]["name"] == "prettier"
+    assert "go" in result

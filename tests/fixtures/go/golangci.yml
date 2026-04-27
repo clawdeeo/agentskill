@@ -1,0 +1,22 @@
+run:
+  timeout: 2m
+  tests: true
+  skip-dirs:
+    - vendor
+    - .git
+
+output:
+  format: colored-line-number
+  print-issued-lines: true
+
+linters:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gci
+    - gofmt
+    - gofumpt
