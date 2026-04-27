@@ -7,10 +7,6 @@ class ParserUnavailableError(RuntimeError):
     """Raised when a required parser dependency is not installed."""
 
 
-# ---------------------------------------------------------------------------
-# TOML resolution: prefer stdlib tomllib (3.11+), fallback to tomli
-# ---------------------------------------------------------------------------
-
 _toml_module = None
 _toml_checked = False
 
@@ -59,10 +55,6 @@ def load_toml(content: str) -> dict[str, Any]:
 
     return mod.loads(content)
 
-
-# ---------------------------------------------------------------------------
-# YAML resolution: PyYAML with safe_load only
-# ---------------------------------------------------------------------------
 
 _yaml_module = None
 _yaml_checked = False
