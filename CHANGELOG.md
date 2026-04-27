@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-04-27
+
+### Added
+
+- `scripts/lib/references.py` — reference source, document, load result, and metadata models
+- `load_local_reference()` / `load_local_references()` — load AGENTS.md from local directories
+- `load_remote_reference()` / `load_remote_references()` — load AGENTS.md from remote repos via shallow clone
+- `_run_git()` — subprocess helper with 60s timeout and error capture
+- `scripts/lib/reference_adaptation.py` — reference adaptation engine with heuristic classification
+- `ReferenceSection`, `AdaptedConvention`, `ReferenceAdaptationResult` — frozen dataclasses for section splitting and convention classification
+- `split_markdown_sections()` — heading-based Markdown section extraction
+- `adapt_reference()` / `adapt_references()` — classify conventions as applicable, mismatched, uncertain, or ignored
+- Category detection with priority ordering: directory_structure, testing, formatter, linter, type_checker, git
+- Language/tool extraction and target analysis comparison
+- Directory path matching against scan tree
+- `scripts/lib/reference_questions.py` — gap detection and targeted question generation
+- `ReferenceQuestion` model with section, question, reason, category, source, blocking, options
+- `generate_reference_questions()` — produce targeted questions from uncertain and mismatched conventions
+- Selective question generation: irrelevant mismatches filtered, ecosystem-aware relevance checks
+- Conflict detection across multiple references proposing different conventions
+- Question deduplication and deterministic ordering
+- `scripts/lib/reference_initialization.py` — empty-project initialization from references
+- `is_empty_target()` — detect empty or near-empty target repositories
+- `build_reference_metadata()` — build deterministic metadata from loaded documents
+- `render_reference_metadata_block()` — render metadata as Markdown HTML comment with JSON
+- `ReferenceInitializationResult` — structured result with adapted references, questions, metadata, warnings
+- `initialize_from_references()` — end-to-end initialization flow
+- `successful_reference_documents()` — filter load results to successful documents
+- `AGENTSKILL_VERSION` constant
+
 ## [0.4.0] - 2026-04-27
 
 ### Added
