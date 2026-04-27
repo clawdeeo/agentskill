@@ -101,3 +101,12 @@ def load_yaml(content: str) -> Any:
         raise ParserUnavailableError("YAML parser unavailable: install 'PyYAML'")
 
     return mod.safe_load(content)
+
+
+def load_yaml_safe(content: str) -> dict[str, Any]:
+    """Parse a YAML document, returning {} on any error."""
+    try:
+        data = load_yaml(content)
+        return data if isinstance(data, dict) else {}
+    except (ParserUnavailableError, Exception):
+        return {}

@@ -18,7 +18,7 @@ from typing import Any
 
 from common.fs import validate_repo
 from lib.output import run_and_output
-from lib.parsers import load_toml_safe
+from lib.parsers import load_toml_safe, load_yaml_safe
 
 MAX_CONFIG_READ_BYTES = 32_000
 
@@ -55,80 +55,13 @@ def _get_nested(d: Any, *keys: str) -> Any | None:
     return d
 
 
-def _parse_yaml_simple(content: str) -> dict:
-    result: dict = {}
-    stack: list[tuple[int, dict | list]] = [(-1, result)]
-    list_key_stack: list[str | None] = [None]
-
-    for line in content.splitlines():
-        if not line.strip() or line.strip().startswith("#"):
-            continue
-
-        indent = len(line) - len(line.lstrip())
-        stripped = line.strip()
-
-        while len(stack) > 1 and stack[-1][0] >= indent:
-            stack.pop()
-            list_key_stack.pop()
-
-        parent = stack[-1][1]
-
-        if stripped.startswith("- "):
-            value = stripped[2:].strip()
-
-            if isinstance(parent, dict):
-                last_key = list_key_stack[-1]
-
-                if last_key and isinstance(parent.get(last_key), list):
-                    parent[last_key].append(_yaml_scalar(value))
-        elif ":" in stripped:
-            key, _, rest = stripped.partition(":")
-            key = key.strip()
-            rest = rest.strip()
-
-            if rest:
-                if isinstance(parent, dict):
-                    parent[key] = _yaml_scalar(rest)
-                    list_key_stack[-1] = key
-            else:
-                if isinstance(parent, dict):
-                    child: dict = {}
-                    parent[key] = child
-                    stack.append((indent, child))
-                    list_key_stack.append(key)
-
-    return result
-
-
-def _yaml_scalar(s: str):
-    s = s.strip().strip('"').strip("'")
-
-    if s.lower() == "true":
-        return True
-
-    if s.lower() == "false":
-        return False
-
-    try:
-        return int(s)
-    except ValueError:
-        pass
-
-    try:
-        return float(s)
-    except ValueError:
-        pass
-
-    return s
-
-
 def _parse_by_extension(raw: str, fname: str) -> dict:
     """Parse raw config file content based on file extension."""
     if fname.endswith(".json") or fname in (".prettierrc", ".eslintrc"):
         return _parse_json_safe(raw) if raw.strip().startswith("{") else {}
 
     if fname.endswith((".yml", ".yaml")):
-        return _parse_yaml_simple(raw)
+        return load_yaml_safe(raw)
 
     if fname.endswith(".toml"):
         return load_toml_safe(raw)

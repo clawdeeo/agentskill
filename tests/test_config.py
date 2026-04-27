@@ -2,10 +2,9 @@ from commands.config import (
     _parse_editorconfig,
     _parse_editorconfig_for_lang,
     _parse_ini_section,
-    _parse_yaml_simple,
     detect,
 )
-from lib.parsers import load_toml_safe
+from lib.parsers import load_toml_safe, load_yaml_safe
 from test_support import create_repo, create_sample_repo
 
 
@@ -23,7 +22,7 @@ def test_config_parsers_cover_toml_yaml_ini_and_editorconfig(tmp_path):
         '[tool.demo]\nenabled = true\nnames = [\n  "a",\n  "b",\n]\n'
     )
 
-    parsed_yaml = _parse_yaml_simple("tool:\n  enabled: true\n  count: 3\n")
+    parsed_yaml = load_yaml_safe("tool:\n  enabled: true\n  count: 3\n")
     parsed_ini = _parse_ini_section("[flake8]\nmax-line-length = 88\n", "[flake8]")
 
     ec_path = tmp_path / ".editorconfig"
@@ -104,3 +103,33 @@ def test_config_load_toml_safe_returns_empty_on_unavailable(monkeypatch):
     monkeypatch.setattr(builtins, "__import__", fake_import)
 
     assert load_toml_safe('[tool]\nkey = "value"') == {}
+
+
+def test_config_load_yaml_safe_handles_invalid_yaml():
+    assert load_yaml_safe("invalid: [broken") == {}
+
+
+def test_config_load_yaml_safe_normalizes_non_dict_output():
+    assert load_yaml_safe("tool:\n  enabled: true") == {"tool": {"enabled": True}}
+    assert load_yaml_safe("- item1\n- item2") == {}
+
+
+def test_config_load_yaml_safe_returns_empty_on_unavailable(monkeypatch):
+    import lib.parsers as parsers_mod
+
+    monkeypatch.setattr(parsers_mod, "_yaml_module", None)
+    monkeypatch.setattr(parsers_mod, "_yaml_checked", False)
+
+    import builtins
+
+    real_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name == "yaml":
+            raise ImportError(name)
+
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+
+    assert load_yaml_safe("tool:\n  key: value") == {}
