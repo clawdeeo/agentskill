@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from lib.references import (
     ReferenceDocument,
     ReferenceLoadResult,
@@ -5,6 +7,8 @@ from lib.references import (
     ReferenceSource,
     load_local_reference,
     load_local_references,
+    load_remote_reference,
+    load_remote_references,
 )
 
 
@@ -275,3 +279,200 @@ def test_load_local_references_batch_preserves_order(tmp_path):
     assert results[2].document is not None
     assert results[0].document.content == "# A\n"
     assert results[2].document.content == "# C\n"
+
+
+def _mock_clone_success(tmp_dir, agents_content="# Rules\n", sha="abc123def"):
+    clone_dir = tmp_dir / "repo"
+    clone_dir.mkdir(parents=True)
+    (clone_dir / "AGENTS.md").write_text(agents_content)
+    return clone_dir
+
+
+def test_load_remote_reference_success(tmp_path):
+    src = ReferenceSource(kind="remote", value="https://github.com/org/repo.git")
+    _mock_clone_success(tmp_path)
+
+    def fake_run_git(cmd, cwd=None):
+        if "clone" in cmd:
+            return 0, "", ""
+        if "rev-parse" in cmd:
+            return 0, "abc123def\n", ""
+        return 1, "", "unknown command"
+
+    with (
+        patch("lib.references._run_git", side_effect=fake_run_git),
+        patch("lib.references.TemporaryDirectory") as mock_tmp,
+    ):
+        mock_tmp.return_value.__enter__ = lambda s: str(tmp_path)
+        mock_tmp.return_value.__exit__ = lambda s, *a: None
+        result = load_remote_reference(src)
+
+    assert result.ok
+    assert result.document is not None
+    assert result.document.content == "# Rules\n"
+    assert result.document.source_path == "AGENTS.md"
+    assert result.document.commit_sha == "abc123def"
+
+
+def test_load_remote_reference_clone_failure(tmp_path):
+    src = ReferenceSource(kind="remote", value="https://github.com/org/repo.git")
+
+    def fake_run_git(cmd, cwd=None):
+        if "clone" in cmd:
+            return 1, "", "fatal: repository not found"
+        return 1, "", ""
+
+    with (
+        patch("lib.references._run_git", side_effect=fake_run_git),
+        patch("lib.references.TemporaryDirectory") as mock_tmp,
+    ):
+        mock_tmp.return_value.__enter__ = lambda s: str(tmp_path)
+        mock_tmp.return_value.__exit__ = lambda s, *a: None
+        result = load_remote_reference(src)
+
+    assert not result.ok
+    assert result.error is not None
+    assert "failed to clone" in result.error
+
+
+def test_load_remote_reference_clone_timeout(tmp_path):
+    src = ReferenceSource(kind="remote", value="https://github.com/org/repo.git")
+
+    def fake_run_git(cmd, cwd=None):
+        return 1, "", "git command timed out after 60s"
+
+    with (
+        patch("lib.references._run_git", side_effect=fake_run_git),
+        patch("lib.references.TemporaryDirectory") as mock_tmp,
+    ):
+        mock_tmp.return_value.__enter__ = lambda s: str(tmp_path)
+        mock_tmp.return_value.__exit__ = lambda s, *a: None
+        result = load_remote_reference(src)
+
+    assert not result.ok
+    assert result.error is not None
+    assert "failed to clone" in result.error
+
+
+def test_load_remote_reference_missing_agents_md(tmp_path):
+    src = ReferenceSource(kind="remote", value="https://github.com/org/repo.git")
+    clone_dir = tmp_path / "repo"
+    clone_dir.mkdir(parents=True)
+
+    def fake_run_git(cmd, cwd=None):
+        if "clone" in cmd:
+            return 0, "", ""
+        if "rev-parse" in cmd:
+            return 0, "abc123\n", ""
+        return 1, "", ""
+
+    with (
+        patch("lib.references._run_git", side_effect=fake_run_git),
+        patch("lib.references.TemporaryDirectory") as mock_tmp,
+    ):
+        mock_tmp.return_value.__enter__ = lambda s: str(tmp_path)
+        mock_tmp.return_value.__exit__ = lambda s, *a: None
+        result = load_remote_reference(src)
+
+    assert not result.ok
+    assert result.error is not None
+    assert "AGENTS.md not found" in result.error
+
+
+def test_load_remote_reference_empty_agents_md(tmp_path):
+    src = ReferenceSource(kind="remote", value="https://github.com/org/repo.git")
+    _mock_clone_success(tmp_path, agents_content="")
+
+    def fake_run_git(cmd, cwd=None):
+        if "clone" in cmd:
+            return 0, "", ""
+        if "rev-parse" in cmd:
+            return 0, "abc123\n", ""
+        return 1, "", ""
+
+    with (
+        patch("lib.references._run_git", side_effect=fake_run_git),
+        patch("lib.references.TemporaryDirectory") as mock_tmp,
+    ):
+        mock_tmp.return_value.__enter__ = lambda s: str(tmp_path)
+        mock_tmp.return_value.__exit__ = lambda s, *a: None
+        result = load_remote_reference(src)
+
+    assert not result.ok
+    assert result.error is not None
+    assert "empty" in result.error
+
+
+def test_load_remote_reference_commit_sha_unavailable(tmp_path):
+    src = ReferenceSource(kind="remote", value="https://github.com/org/repo.git")
+    _mock_clone_success(tmp_path)
+
+    def fake_run_git(cmd, cwd=None):
+        if "clone" in cmd:
+            return 0, "", ""
+        if "rev-parse" in cmd:
+            return 1, "", "not a git repo"
+        return 1, "", ""
+
+    with (
+        patch("lib.references._run_git", side_effect=fake_run_git),
+        patch("lib.references.TemporaryDirectory") as mock_tmp,
+    ):
+        mock_tmp.return_value.__enter__ = lambda s: str(tmp_path)
+        mock_tmp.return_value.__exit__ = lambda s, *a: None
+        result = load_remote_reference(src)
+
+    assert result.ok
+    assert result.document is not None
+    assert result.document.commit_sha is None
+
+
+def test_load_remote_reference_unsupported_kind():
+    src = ReferenceSource(kind="local", value="../some-repo")
+    result = load_remote_reference(src)
+
+    assert not result.ok
+    assert result.error is not None
+    assert "unsupported remote reference source kind" in result.error
+
+
+def test_load_remote_references_batch_preserves_order(tmp_path):
+    src_ok = ReferenceSource(kind="remote", value="https://github.com/org/ok.git")
+    src_fail = ReferenceSource(kind="remote", value="https://github.com/org/fail.git")
+    src_ok2 = ReferenceSource(kind="remote", value="https://github.com/org/ok2.git")
+
+    call_count = 0
+
+    def fake_run_git(cmd, cwd=None):
+        nonlocal call_count
+        call_count += 1
+
+        if "clone" in cmd:
+            if "fail" in cmd[4]:
+                return 1, "", "fatal: not found"
+
+            clone_dir = tmp_path / "repo"
+            if not clone_dir.exists():
+                clone_dir.mkdir(parents=True)
+            if not (clone_dir / "AGENTS.md").exists():
+                (clone_dir / "AGENTS.md").write_text("# Rules\n")
+
+            return 0, "", ""
+
+        if "rev-parse" in cmd:
+            return 0, "abc123\n", ""
+
+        return 1, "", ""
+
+    with (
+        patch("lib.references._run_git", side_effect=fake_run_git),
+        patch("lib.references.TemporaryDirectory") as mock_tmp,
+    ):
+        mock_tmp.return_value.__enter__ = lambda s: str(tmp_path)
+        mock_tmp.return_value.__exit__ = lambda s, *a: None
+        results = load_remote_references([src_ok, src_fail, src_ok2])
+
+    assert len(results) == 3
+    assert results[0].ok
+    assert not results[1].ok
+    assert results[2].ok
