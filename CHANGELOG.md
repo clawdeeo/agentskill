@@ -7,7 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.5.0] - 2026-04-27
+## [0.6.0] - 2026-04-28
+
+### Added
+
+- Shared language registry — `scripts/common/languages.py` with `LanguageSpec`, 15 languages, 6 helper functions
+- `language_for_path()`, `language_for_extension()`, `language_by_id()`, `is_test_path()`, `is_supported_language()`, `all_language_specs()`
+- TypeScript and JavaScript parity across graph, symbols, and tests analyzers
+- Comment stripping for JS/TS sources
+- ES import and re-export extraction with line numbers
+- CommonJS `require()` extraction
+- Local relative import resolution with candidate extensions (.ts/.tsx/.js/.jsx/.mjs/.cjs + index variants)
+- TypeScript symbol extraction: functions, classes, interfaces, type aliases, arrow functions, constants with exported flag
+- TypeScript test mapping: `.test.ts`/`.spec.ts` to source files
+- TypeScript framework detection from package.json (jest, vitest, mocha)
+- `.cjs` extension support across analyzers
+- Go and Rust parity across graph, symbols, and tests analyzers
+- Go module path detection from `go.mod`
+- Go import extraction with line numbers (single imports and import blocks)
+- Go package boundary detection by directory
+- Go symbol extraction: functions, methods, structs, interfaces, type aliases, constants, variables
+- Go test mapping: `*_test.go` to source files
+- Java and Kotlin support across analyzers and tests
+- C#, C, and C++ support across analyzers and tests
+- Ruby, PHP, and Bash support across analyzers and tests
+- Swift and Objective-C support across analyzers and tests
+- Config analyzer with multi-language config detection
+- Language-specific example repositories under `examples/`
+- Comprehensive test coverage: 345 tests passing
+
+### Changed
+
+- `scan` command migrated to use `language_for_path()` from shared registry
+- `measure` command migrated to use `language_for_extension()` from shared registry
+- `graph` analyzer: Go edges now include accurate line numbers
+- `graph` analyzer: added Rust module/use graph with `mod` and `use` statement extraction
+- `graph` analyzer: added JavaScript file collection with `.cjs` extension
+- `symbols` analyzer: Go extraction enhanced with methods, interfaces, type aliases, and variables
+- `symbols` analyzer: added Rust symbol extraction with structs, enums, traits, impls, constants, statics
+- `tests` analyzer: added Go and Rust test detection and mapping
+- `tests` analyzer: added Java, Kotlin, C#, C, C++, Ruby, PHP, Bash, Swift, Objective-C framework detection
 
 ### Added
 
