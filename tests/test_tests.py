@@ -3,6 +3,7 @@ from commands.tests import (
     _detect_ts_framework,
     _extract_run_command,
     _find_conftest_files,
+    _map_jvm_tests,
     _map_python_tests,
     analyze_tests,
 )
@@ -80,6 +81,83 @@ def test_tests_detect_unittest_ts_and_mapping_gaps(tmp_path):
     assert framework == "vitest"
     assert command == "vitest run"
     assert result["typescript"]["naming"]["file_pattern"] == "<module>.spec.ts"
+
+
+def test_tests_detect_java_and_kotlin_mappings(tmp_path):
+    repo = create_repo(
+        tmp_path,
+        {
+            "pom.xml": "<project/>\n",
+            "build.gradle.kts": "plugins {}\n",
+            "src/main/java/com/acme/UserService.java": (
+                "package com.acme;\npublic class UserService {}\n"
+            ),
+            "src/test/java/com/acme/UserServiceTest.java": (
+                "import org.junit.jupiter.api.Test;\n\n"
+                "class UserServiceTest {\n"
+                "    @Test\n"
+                "    void starts() {}\n"
+                "}\n"
+            ),
+            "src/main/kotlin/com/acme/UserService.kt": (
+                "package com.acme\nclass UserService\n"
+            ),
+            "src/test/kotlin/com/acme/UserServiceTest.kt": (
+                "import kotlin.test.Test\n\n"
+                "class UserServiceTest {\n"
+                "    @Test\n"
+                "    fun works() {}\n"
+                "}\n"
+            ),
+        },
+    )
+
+    result = analyze_tests(str(repo))
+    assert result["java"]["framework"] == "junit"
+
+    assert result["java"]["coverage_shape"]["mapped"] == [
+        {
+            "source": "src/main/java/com/acme/UserService.java",
+            "test": "src/test/java/com/acme/UserServiceTest.java",
+        }
+    ]
+
+    assert result["kotlin"]["framework"] == "kotlin-test"
+
+    assert result["kotlin"]["coverage_shape"]["mapped"] == [
+        {
+            "source": "src/main/kotlin/com/acme/UserService.kt",
+            "test": "src/test/kotlin/com/acme/UserServiceTest.kt",
+        }
+    ]
+
+
+def test_map_jvm_tests_reports_untested_sources(tmp_path):
+    repo = create_repo(
+        tmp_path,
+        {
+            "src/main/java/com/acme/UserService.java": "public class UserService {}\n",
+            "src/main/java/com/acme/Helper.java": "class Helper {}\n",
+            "src/test/java/com/acme/UserServiceTests.java": "class UserServiceTests {}\n",
+        },
+    )
+
+    mapping = _map_jvm_tests(
+        [
+            repo / "src/main/java/com/acme/UserService.java",
+            repo / "src/main/java/com/acme/Helper.java",
+        ],
+        [repo / "src/test/java/com/acme/UserServiceTests.java"],
+        repo,
+    )
+
+    assert mapping["mapped"] == [
+        {
+            "source": "src/main/java/com/acme/UserService.java",
+            "test": "src/test/java/com/acme/UserServiceTests.java",
+        }
+    ]
+    assert mapping["untested_source_files"] == ["src/main/java/com/acme/Helper.java"]
 
 
 def test_tests_reports_invalid_repo_paths(tmp_path):

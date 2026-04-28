@@ -470,6 +470,188 @@ def _strip_rust_comments(source: str) -> str:
     return source
 
 
+def _strip_jvm_comments(source: str) -> str:
+    source = re.sub(r"//.*", "", source)
+    source = re.sub(r"/\*.*?\*/", "", source, flags=re.DOTALL)
+    return source
+
+
+def _extract_java(files: list[Path]) -> dict:
+    decl_re = re.compile(
+        r"^\s*(?P<mods>(?:public|private|protected|static|final|abstract)\s+)*"
+        r"(?P<kind>class|interface|enum|@interface)\s+"
+        r"(?P<name>[A-Za-z_]\w*)",
+        re.MULTILINE,
+    )
+
+    method_re = re.compile(
+        r"^\s*(?P<mods>(?:public|private|protected|static|final|abstract|synchronized)\s+)*"
+        r"(?:(?P<return>[A-Za-z_][\w<>\[\], ?]*)\s+)?"
+        r"(?P<name>[A-Za-z_]\w*)\s*\(",
+        re.MULTILINE,
+    )
+
+    classes: list[str] = []
+    interfaces: list[str] = []
+    enums: list[str] = []
+    annotations: list[str] = []
+    methods: list[str] = []
+    constructors: list[str] = []
+    constants: list[str] = []
+    file_names: list[str] = []
+    declared_types: set[str] = set()
+
+    for fpath in files:
+        file_names.append(fpath.stem)
+
+        try:
+            source = _strip_jvm_comments(read_text(fpath))
+        except Exception:
+            continue
+
+        for match in decl_re.finditer(source):
+            kind = match.group("kind")
+            name = match.group("name")
+            declared_types.add(name)
+
+            if kind == "class":
+                classes.append(name)
+            elif kind == "interface":
+                interfaces.append(name)
+            elif kind == "enum":
+                enums.append(name)
+            elif kind == "@interface":
+                annotations.append(name)
+
+        for match in method_re.finditer(source):
+            name = match.group("name")
+            return_type = match.group("return")
+
+            if name in {"if", "for", "while", "switch", "catch", "return", "new"}:
+                continue
+
+            if return_type is None and name in declared_types:
+                constructors.append(name)
+            elif return_type is not None:
+                methods.append(name)
+
+        for match in re.finditer(
+            r"^\s*(?:public|private|protected)?\s*static\s+final\s+[\w<>\[\], ?]+\s+([A-Z_][A-Z0-9_]*)\b",
+            source,
+            re.MULTILINE,
+        ):
+            constants.append(match.group(1))
+
+    result: dict = {
+        "classes": _pattern_summary(classes),
+        "methods": _pattern_summary(methods),
+        "constants": _pattern_summary(constants),
+        "files": _pattern_summary(file_names),
+    }
+
+    if interfaces:
+        result["interfaces"] = _pattern_summary(interfaces)
+
+    if enums:
+        result["enums"] = _pattern_summary(enums)
+
+    if annotations:
+        result["annotations"] = _pattern_summary(annotations)
+
+    if constructors:
+        result["constructors"] = _pattern_summary(constructors)
+
+    return result
+
+
+def _extract_kotlin(files: list[Path]) -> dict:
+    type_re = re.compile(
+        r"^\s*(?P<enum_mods>(?:public|private|protected|internal)\s+)*enum\s+class\s+(?P<enum_name>[A-Za-z_]\w*)|"
+        r"^\s*(?P<mods>(?:public|private|protected|internal|open|abstract|sealed|data)\s+)*"
+        r"(?P<kind>class|interface|object)\s+(?P<name>[A-Za-z_]\w*)",
+        re.MULTILINE,
+    )
+
+    function_re = re.compile(
+        r"^\s*(?P<mods>(?:public|private|protected|internal|override|suspend|inline|tailrec|operator|infix)\s+)*"
+        r"fun\s+(?:[A-Za-z_][\w.<>?, ]+\.)?(?P<name>[A-Za-z_]\w*)\s*\(",
+        re.MULTILINE,
+    )
+
+    property_re = re.compile(
+        r"^\s*(?P<mods>(?:public|private|protected|internal|lateinit|override)\s+)*"
+        r"(?P<const>const\s+)?(?:val|var)\s+(?P<name>[A-Za-z_]\w*)\b",
+        re.MULTILINE,
+    )
+
+    classes: list[str] = []
+    interfaces: list[str] = []
+    objects: list[str] = []
+    enums: list[str] = []
+    functions: list[str] = []
+    properties: list[str] = []
+    constants: list[str] = []
+    file_names: list[str] = []
+
+    for fpath in files:
+        file_names.append(fpath.stem)
+
+        try:
+            source = _strip_jvm_comments(read_text(fpath))
+        except Exception:
+            continue
+
+        for match in type_re.finditer(source):
+            kind = match.group("kind")
+
+            if match.group("enum_name"):
+                enums.append(match.group("enum_name"))
+                continue
+
+            name = match.group("name")
+            if not kind or not name:
+                continue
+
+            if kind == "class":
+                classes.append(name)
+            elif kind == "interface":
+                interfaces.append(name)
+            elif kind == "object":
+                objects.append(name)
+
+        for match in function_re.finditer(source):
+            functions.append(match.group("name"))
+
+        for match in property_re.finditer(source):
+            name = match.group("name")
+
+            if match.group("const"):
+                constants.append(name)
+            else:
+                properties.append(name)
+
+    result: dict = {
+        "classes": _pattern_summary(classes),
+        "functions": _pattern_summary(functions),
+        "constants": _pattern_summary(constants),
+        "files": _pattern_summary(file_names),
+    }
+
+    if interfaces:
+        result["interfaces"] = _pattern_summary(interfaces)
+
+    if objects:
+        result["objects"] = _pattern_summary(objects)
+
+    if enums:
+        result["enums"] = _pattern_summary(enums)
+
+    if properties:
+        result["properties"] = _pattern_summary(properties)
+
+    return result
+
+
 def _extract_rust(files: list[Path]) -> dict:
     func_re = re.compile(r"^\s*(?:pub\s+)?(?:async\s+)?fn\s+(\w+)", re.MULTILINE)
     struct_re = re.compile(r"^\s*(?:pub\s+)?struct\s+(\w+)", re.MULTILINE)
@@ -572,6 +754,12 @@ def extract_symbols(repo_path: str, lang_filter: str | None = None) -> dict:
 
     if not lang_filter or lang_filter == "rust":
         _run("rust", [".rs"], _extract_rust)
+
+    if not lang_filter or lang_filter == "java":
+        _run("java", [".java"], _extract_java)
+
+    if not lang_filter or lang_filter == "kotlin":
+        _run("kotlin", [".kt", ".kts"], _extract_kotlin)
 
     return result
 

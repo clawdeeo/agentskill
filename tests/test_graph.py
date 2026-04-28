@@ -53,6 +53,46 @@ def test_graph_detects_ts_go_and_monorepo_boundaries(tmp_path):
     assert result["monorepo_boundaries"]["detected"] is True
 
 
+def test_graph_detects_java_and_kotlin_internal_imports(tmp_path):
+    repo = create_repo(
+        tmp_path,
+        {
+            "src/main/java/com/acme/App.java": (
+                "package com.acme;\n\n"
+                "import com.acme.service.UserService;\n"
+                "import java.util.List;\n\n"
+                "public class App {}\n"
+            ),
+            "src/main/java/com/acme/service/UserService.java": (
+                "package com.acme.service;\n\npublic class UserService {}\n"
+            ),
+            "src/main/kotlin/com/acme/Main.kt": (
+                "package com.acme\n\n"
+                "import com.acme.service.UserService\n"
+                "import kotlinx.coroutines.runBlocking\n\n"
+                "fun main() {}\n"
+            ),
+            "src/main/kotlin/com/acme/service/UserService.kt": (
+                "package com.acme.service\n\nclass UserService\n"
+            ),
+        },
+    )
+
+    result = build_graph(str(repo))
+
+    assert {
+        "from": "src/main/java/com/acme/App.java",
+        "to": "src/main/java/com/acme/service/UserService.java",
+        "line": 3,
+    } in result["java"]["edges"]
+
+    assert {
+        "from": "src/main/kotlin/com/acme/Main.kt",
+        "to": "src/main/kotlin/com/acme/service/UserService.kt",
+        "line": 3,
+    } in result["kotlin"]["edges"]
+
+
 def test_graph_reports_invalid_repo_paths(tmp_path):
     missing = tmp_path / "missing"
 

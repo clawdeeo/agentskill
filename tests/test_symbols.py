@@ -65,6 +65,55 @@ def test_symbols_extracts_typescript_and_go(tmp_path):
     assert result["go"]["variables"]["total"] >= 1
 
 
+def test_symbols_extracts_java_and_kotlin(tmp_path):
+    repo = create_repo(
+        tmp_path,
+        {
+            "src/main/java/com/acme/UserService.java": (
+                "package com.acme;\n\n"
+                "public class UserService {\n"
+                "    public UserService() {}\n"
+                "    public void start() {}\n"
+                '    private String helper() { return ""; }\n'
+                "}\n\n"
+                "interface Store {}\n"
+                "enum Status {}\n"
+                "@interface Marker {}\n"
+            ),
+            "src/main/kotlin/com/acme/App.kt": (
+                "package com.acme\n\n"
+                "class UserService\n"
+                "data class User(val id: String)\n"
+                "sealed class Result\n"
+                "interface Store\n"
+                "object AppConfig\n"
+                "enum class Status { OK }\n\n"
+                "fun start() {}\n"
+                "private fun helper() {}\n"
+                'const val VERSION = "1"\n'
+                'val name = "x"\n'
+            ),
+        },
+    )
+
+    result = extract_symbols(str(repo))
+
+    assert result["java"]["classes"]["patterns"]["PascalCase"]["count"] >= 1
+    assert result["java"]["methods"]["total"] >= 2
+    assert result["java"]["interfaces"]["total"] >= 1
+    assert result["java"]["enums"]["total"] >= 1
+    assert result["java"]["annotations"]["total"] >= 1
+    assert result["java"]["constructors"]["total"] >= 1
+
+    assert result["kotlin"]["classes"]["total"] >= 3
+    assert result["kotlin"]["interfaces"]["total"] >= 1
+    assert result["kotlin"]["objects"]["total"] >= 1
+    assert result["kotlin"]["enums"]["total"] >= 1
+    assert result["kotlin"]["functions"]["total"] >= 2
+    assert result["kotlin"]["constants"]["total"] >= 1
+    assert result["kotlin"]["properties"]["total"] >= 1
+
+
 def test_symbols_reports_invalid_repo_paths(tmp_path):
     missing = tmp_path / "missing"
 

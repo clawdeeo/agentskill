@@ -145,6 +145,8 @@ def _parse_editorconfig_for_lang(sections: dict, lang: str) -> dict:
         "javascript": ["*.js", "*.jsx", "*.mjs"],
         "go": ["*.go"],
         "rust": ["*.rs"],
+        "java": ["*.java"],
+        "kotlin": ["*.kt", "*.kts"],
         "ruby": ["*.rb"],
     }
 
@@ -394,6 +396,55 @@ def _detect_rust(repo: Path) -> dict:
     return result
 
 
+def _detect_jvm_markers(repo: Path, language: str) -> dict:
+    markers: list[str] = []
+    build_files = {
+        "java": [
+            "pom.xml",
+            "build.gradle",
+            "build.gradle.kts",
+            "settings.gradle",
+            "settings.gradle.kts",
+        ],
+        "kotlin": [
+            "build.gradle",
+            "build.gradle.kts",
+            "settings.gradle",
+            "settings.gradle.kts",
+        ],
+    }
+
+    source_roots = {
+        "java": ["src/main/java", "src/test/java"],
+        "kotlin": ["src/main/kotlin", "src/test/kotlin"],
+    }
+
+    for marker in build_files.get(language, []):
+        if (repo / marker).exists():
+            markers.append(marker)
+
+    for root in source_roots.get(language, []):
+        if (repo / root).exists():
+            markers.append(root)
+
+    if not markers:
+        return {}
+
+    build_tool = None
+
+    if language == "java" and "pom.xml" in markers:
+        build_tool = "maven"
+    elif any(marker.startswith("build.gradle") for marker in markers) or any(
+        marker.startswith("settings.gradle") for marker in markers
+    ):
+        build_tool = "gradle"
+
+    return {
+        "project_markers": sorted(markers),
+        "build_tool": build_tool,
+    }
+
+
 def _attach_editorconfig(lang_result: dict, ec_sections: dict, lang: str) -> None:
     """Mutate lang_result in place: attach editorconfig entry if one exists."""
     ec = _parse_editorconfig_for_lang(ec_sections, lang)
@@ -444,6 +495,18 @@ def detect(repo_path: str) -> dict:
     if (repo / "Cargo.toml").exists() or list(repo.rglob("*.rs")):
         _attach_editorconfig(rust, ec_sections, "rust")
         result["rust"] = rust
+
+    java = _detect_jvm_markers(repo, "java")
+
+    if java or list(repo.rglob("*.java")):
+        _attach_editorconfig(java, ec_sections, "java")
+        result["java"] = java
+
+    kotlin = _detect_jvm_markers(repo, "kotlin")
+
+    if kotlin or list(repo.rglob("*.kt")) or list(repo.rglob("*.kts")):
+        _attach_editorconfig(kotlin, ec_sections, "kotlin")
+        result["kotlin"] = kotlin
 
     if ec_sections:
         result["editorconfig"] = ec_sections

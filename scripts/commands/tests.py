@@ -18,6 +18,7 @@ from pathlib import Path
 
 from common.constants import should_skip_dir
 from common.fs import count_lines, read_text, validate_repo
+from common.languages import is_test_path, language_for_path
 from lib.output import run_and_output
 
 FRAMEWORK_DETECTION_SAMPLE = 5
@@ -37,6 +38,14 @@ FRAMEWORK_RUN_DEFAULTS = {
 TOP_LEVEL_TEST_DIRS = {"tests", "test", "__tests__", "spec"}
 
 SOURCE_ROOT_CANDIDATES = ["src", "lib", "pkg"]
+
+JVM_TEST_FRAMEWORKS = {
+    "org.junit.Test": "junit",
+    "org.junit.jupiter.api.Test": "junit",
+    "org.junit.jupiter.params.ParameterizedTest": "junit",
+    "org.testng.annotations.Test": "testng",
+    "kotlin.test": "kotlin-test",
+}
 
 
 def _most_common(lst: list[str]) -> str | None:
@@ -282,10 +291,10 @@ def _map_python_tests(
             unmatched_tests.append(str(tf.relative_to(repo)))
 
     for sf in source_files:
-        rel = str(sf.relative_to(repo))
+        rel_str = str(sf.relative_to(repo))
 
-        if rel not in matched_tests:
-            untested.append(rel)
+        if rel_str not in matched_tests:
+            untested.append(rel_str)
 
     return {
         "mapped": mapped,
@@ -520,12 +529,57 @@ def _collect_rust_files(repo: Path) -> tuple[list[Path], list[Path]]:
     return test_files, source_files
 
 
+def _collect_jvm_files(
+    repo: Path, language_id: str, test_roots: tuple[str, ...]
+) -> tuple[list[Path], list[Path]]:
+    test_files: list[Path] = []
+    source_files: list[Path] = []
+
+    for dirpath, dirs, files in os.walk(repo):
+        dirs[:] = [d for d in dirs if not should_skip_dir(d)]
+
+        for fn in files:
+            fpath = Path(dirpath) / fn
+            spec = language_for_path(fpath)
+
+            if not spec or spec.id != language_id:
+                continue
+
+            rel = str(fpath.relative_to(repo))
+
+            if is_test_path(rel, language_id=language_id) or any(
+                rel.startswith(root + "/") for root in test_roots
+            ):
+                test_files.append(fpath)
+            else:
+                source_files.append(fpath)
+
+    return test_files, source_files
+
+
 def _detect_go_framework(repo: Path) -> str:
     return "go test"
 
 
 def _detect_rust_framework(repo: Path) -> str:
     return "cargo test"
+
+
+def _detect_jvm_framework(test_files: list[Path]) -> str:
+    for fpath in test_files[:FRAMEWORK_DETECTION_SAMPLE]:
+        try:
+            content = read_text(fpath)
+        except Exception:
+            continue
+
+        for marker, framework in JVM_TEST_FRAMEWORKS.items():
+            if marker in content:
+                return framework
+
+        if "@Test" in content or "@ParameterizedTest" in content:
+            return "junit"
+
+    return "junit"
 
 
 def _map_go_tests(source_files: list[Path], test_files: list[Path], repo: Path) -> dict:
@@ -612,6 +666,76 @@ def _map_rust_tests(
     }
 
 
+def _map_jvm_tests(
+    source_files: list[Path], test_files: list[Path], repo: Path
+) -> dict:
+    mapped: list[dict] = []
+    untested: list[str] = []
+    unmatched_tests: list[str] = []
+    source_by_key: dict[tuple[str, str], Path] = {}
+    matched_tests: set[str] = set()
+
+    for sf in source_files:
+        rel = sf.relative_to(repo)
+        stem = sf.stem.lower()
+        parent_key = rel.parent.as_posix().lower()
+        source_by_key[(parent_key, stem)] = sf
+
+    for tf in test_files:
+        rel = tf.relative_to(repo)
+        stem = tf.stem
+        candidate = re.sub(r"(tests?|spec)$", "", stem, flags=re.IGNORECASE).lower()
+        parent_parts = list(rel.parent.parts)
+
+        if "test" in parent_parts:
+            parent_parts[parent_parts.index("test")] = "main"
+        if "java" in parent_parts and "test" not in parent_parts:
+            parent_parts = parent_parts
+        if "kotlin" in parent_parts and "test" not in parent_parts:
+            parent_parts = parent_parts
+
+        parent_key = Path(*parent_parts).as_posix().lower()
+        match = source_by_key.get((parent_key, candidate))
+
+        if match is None and "src/test/" in rel.as_posix():
+            alt_parent = rel.parent.as_posix().replace("src/test/", "src/main/", 1)
+            match = source_by_key.get((alt_parent.lower(), candidate))
+
+        if match is None:
+            package_tail = "/".join(rel.parent.parts[-3:]).lower()
+            for (key_parent, key_stem), source_file in source_by_key.items():
+                if key_stem == candidate and (
+                    key_parent.endswith(package_tail)
+                    or package_tail.endswith(key_parent)
+                ):
+                    match = source_file
+                    break
+
+        if match:
+            matched_tests.add(str(match.relative_to(repo)))
+
+            mapped.append(
+                {
+                    "source": str(match.relative_to(repo)),
+                    "test": str(tf.relative_to(repo)),
+                }
+            )
+        else:
+            unmatched_tests.append(str(tf.relative_to(repo)))
+
+    for sf in source_files:
+        rel_str = str(sf.relative_to(repo))
+
+        if rel_str not in matched_tests:
+            untested.append(rel_str)
+
+    return {
+        "mapped": mapped,
+        "untested_source_files": untested,
+        "test_files_without_source_match": unmatched_tests,
+    }
+
+
 def _analyze_go(repo: Path) -> dict | None:
     test_files, source_files = _collect_go_files(repo)
 
@@ -648,6 +772,60 @@ def _analyze_rust(repo: Path) -> dict | None:
     framework = _detect_rust_framework(repo)
     run_cmd = _extract_run_command(repo, framework) or framework
     coverage = _map_rust_tests(source_files, test_files, repo)
+    structure = _detect_test_structure(repo, test_files)
+    naming = _detect_naming_patterns(test_files)
+    rep_test = _pick_representative(test_files)
+
+    return {
+        "framework": framework,
+        "run_command": run_cmd,
+        "test_files": len(test_files),
+        "source_files": len(source_files),
+        "coverage_shape": coverage,
+        "structure": structure,
+        "naming": naming,
+        "representative_test": str(Path(rep_test).relative_to(repo))
+        if rep_test
+        else None,
+    }
+
+
+def _analyze_java(repo: Path) -> dict | None:
+    test_files, source_files = _collect_jvm_files(repo, "java", ("src/test/java",))
+
+    if not test_files and not source_files:
+        return None
+
+    framework = _detect_jvm_framework(test_files)
+    run_cmd = _extract_run_command(repo, "junit") or "junit"
+    coverage = _map_jvm_tests(source_files, test_files, repo)
+    structure = _detect_test_structure(repo, test_files)
+    naming = _detect_naming_patterns(test_files)
+    rep_test = _pick_representative(test_files)
+
+    return {
+        "framework": framework,
+        "run_command": run_cmd,
+        "test_files": len(test_files),
+        "source_files": len(source_files),
+        "coverage_shape": coverage,
+        "structure": structure,
+        "naming": naming,
+        "representative_test": str(Path(rep_test).relative_to(repo))
+        if rep_test
+        else None,
+    }
+
+
+def _analyze_kotlin(repo: Path) -> dict | None:
+    test_files, source_files = _collect_jvm_files(repo, "kotlin", ("src/test/kotlin",))
+
+    if not test_files and not source_files:
+        return None
+
+    framework = _detect_jvm_framework(test_files)
+    run_cmd = _extract_run_command(repo, framework) or framework
+    coverage = _map_jvm_tests(source_files, test_files, repo)
     structure = _detect_test_structure(repo, test_files)
     naming = _detect_naming_patterns(test_files)
     rep_test = _pick_representative(test_files)
@@ -705,6 +883,22 @@ def analyze_tests(repo_path: str) -> dict:
             result["rust"] = rs
     except Exception as exc:
         result["rust"] = {"error": str(exc)}
+
+    try:
+        java = _analyze_java(repo)
+
+        if java:
+            result["java"] = java
+    except Exception as exc:
+        result["java"] = {"error": str(exc)}
+
+    try:
+        kotlin = _analyze_kotlin(repo)
+
+        if kotlin:
+            result["kotlin"] = kotlin
+    except Exception as exc:
+        result["kotlin"] = {"error": str(exc)}
 
     return result
 

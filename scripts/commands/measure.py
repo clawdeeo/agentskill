@@ -39,6 +39,9 @@ TOP_LEVEL_DEF_RE: dict[str, re.Pattern] = {
     ),
     "ruby": re.compile(r"^def\s+\w+|^class\s+\w+|^module\s+\w+"),
     "java": re.compile(r"^\s*(public|private|protected|static|final|abstract)\s+.*\{$"),
+    "kotlin": re.compile(
+        r"^\s*(?:public|private|protected|internal)?\s*(?:data\s+|sealed\s+|enum\s+)?(?:class|interface|object)\s+\w+|^\s*(?:public|private|protected|internal)?\s*(?:suspend\s+)?fun\s+\w+"
+    ),
 }
 
 METHOD_DEF_RE: dict[str, re.Pattern] = {
@@ -48,6 +51,12 @@ METHOD_DEF_RE: dict[str, re.Pattern] = {
     "javascript": re.compile(r"^  (async\s+)?\w+\s*\("),
     "go": re.compile(r"^\tfunc\s+"),
     "ruby": re.compile(r"^  def\s+"),
+    "java": re.compile(
+        r"^\s*(?:public|private|protected)\s+(?:static\s+)?[\w<>\[\], ?]+\s+\w+\s*\("
+    ),
+    "kotlin": re.compile(
+        r"^\s*(?:public|private|protected|internal)?\s*(?:override\s+)?(?:suspend\s+)?fun\s+\w+\s*\("
+    ),
 }
 
 

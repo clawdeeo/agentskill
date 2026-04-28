@@ -17,6 +17,7 @@ from pathlib import Path
 
 from common.constants import should_skip_dir
 from common.fs import read_text, validate_repo
+from common.languages import language_for_path
 from lib.output import run_and_output
 
 MAX_EDGES = 200
@@ -28,23 +29,17 @@ MONOREPO_BOUNDARY_DIRS = ["services", "packages", "apps", "modules"]
 
 
 def _collect_files(repo: Path, lang: str) -> list[Path]:
-    ext_map = {
-        "python": [".py"],
-        "typescript": [".ts", ".tsx"],
-        "javascript": [".js", ".jsx", ".mjs", ".cjs"],
-        "go": [".go"],
-        "rust": [".rs"],
-    }
-
-    exts = set(ext_map.get(lang, []))
     found = []
 
     for dirpath, dirs, files in os.walk(repo):
         dirs[:] = [d for d in dirs if not should_skip_dir(d)]
 
         for fn in files:
-            if Path(fn).suffix.lower() in exts:
-                found.append(Path(dirpath) / fn)
+            fpath = Path(dirpath) / fn
+            spec = language_for_path(fpath)
+
+            if spec and spec.id == lang:
+                found.append(fpath)
 
     return found
 
@@ -455,6 +450,125 @@ def _build_rust_graph(files: list[Path], repo: Path) -> dict:
     return _graph_result(sorted(adjacency.keys()), edges, adjacency, parse_errors)
 
 
+def _strip_jvm_comments(source: str) -> str:
+    source = re.sub(r"//.*", "", source)
+    source = re.sub(r"/\*.*?\*/", "", source, flags=re.DOTALL)
+    return source
+
+
+def _extract_jvm_package(content: str) -> str | None:
+    stripped = _strip_jvm_comments(content)
+
+    match = re.search(
+        r"^[ \t]*package\s+([A-Za-z_][\w.]*)[ \t]*;?[ \t]*$",
+        stripped,
+        re.MULTILINE,
+    )
+
+    return match.group(1) if match else None
+
+
+def _extract_jvm_imports(content: str) -> list[tuple[str, int]]:
+    stripped = _strip_jvm_comments(content)
+    imports: list[tuple[str, int]] = []
+
+    pattern = re.compile(
+        r"^[ \t]*import\s+(?:static\s+)?([A-Za-z_][\w.]*)(?:\.\*)?[ \t]*;?[ \t]*$",
+        re.MULTILINE,
+    )
+
+    for match in pattern.finditer(stripped):
+        imports.append((match.group(1), stripped[: match.start()].count("\n") + 1))
+
+    return imports
+
+
+def _jvm_declared_name(path: Path) -> str | None:
+    if path.suffix.lower() == ".kts":
+        return None
+
+    stem = path.stem
+
+    if stem and stem[0].isupper():
+        return stem
+
+    return None
+
+
+def _build_jvm_package_index(
+    files: list[Path], repo: Path
+) -> tuple[dict[str, str], dict[str, set[str]]]:
+    symbol_index: dict[str, str] = {}
+    package_index: dict[str, set[str]] = {}
+
+    for fpath in files:
+        rel = str(fpath.relative_to(repo))
+
+        try:
+            source = read_text(fpath)
+        except Exception:
+            continue
+
+        package_name = _extract_jvm_package(source)
+        declared_name = _jvm_declared_name(fpath)
+
+        if package_name:
+            package_index.setdefault(package_name, set()).add(rel)
+
+            if declared_name:
+                symbol_index[f"{package_name}.{declared_name}"] = rel
+        elif declared_name:
+            symbol_index[declared_name] = rel
+
+    return symbol_index, package_index
+
+
+def _resolve_jvm_import(
+    import_name: str,
+    symbol_index: dict[str, str],
+    package_index: dict[str, set[str]],
+) -> str | None:
+    if import_name in symbol_index:
+        return symbol_index[import_name]
+
+    package_name = import_name.rsplit(".", 1)[0] if "." in import_name else import_name
+    matches = package_index.get(package_name)
+
+    if not matches:
+        return None
+
+    if len(matches) == 1:
+        return next(iter(matches))
+
+    return None
+
+
+def _build_jvm_graph(files: list[Path], repo: Path) -> dict:
+    edges: list[dict] = []
+    adjacency: dict[str, list[str]] = {}
+    parse_errors: list[str] = []
+    symbol_index, package_index = _build_jvm_package_index(files, repo)
+
+    for fpath in files:
+        rel = str(fpath.relative_to(repo))
+        adjacency.setdefault(rel, [])
+
+        try:
+            source = read_text(fpath)
+        except Exception:
+            parse_errors.append(rel)
+            continue
+
+        for import_name, lineno in _extract_jvm_imports(source):
+            resolved = _resolve_jvm_import(import_name, symbol_index, package_index)
+
+            if resolved and resolved != rel:
+                edges.append({"from": rel, "to": resolved, "line": lineno})
+                adjacency[rel].append(resolved)
+
+    return _graph_result(sorted(adjacency.keys()), edges, adjacency, parse_errors)
+
+
 def _compute_most_depended(
     adjacency: dict[str, list[str]],
 ) -> list[dict[str, str | int]]:
@@ -554,7 +668,7 @@ def build_graph(repo_path: str, lang_filter: str | None = None) -> dict:
     langs = (
         [lang_filter]
         if lang_filter
-        else ["python", "typescript", "javascript", "go", "rust"]
+        else ["python", "typescript", "javascript", "go", "rust", "java", "kotlin"]
     )
 
     for lang in langs:
@@ -572,6 +686,8 @@ def build_graph(repo_path: str, lang_filter: str | None = None) -> dict:
                 result[lang] = _build_go_graph(files, repo)
             elif lang == "rust":
                 result[lang] = _build_rust_graph(files, repo)
+            elif lang in ("java", "kotlin"):
+                result[lang] = _build_jvm_graph(files, repo)
         except Exception as exc:
             result[lang] = {"error": str(exc)}
 

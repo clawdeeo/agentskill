@@ -88,9 +88,15 @@ _JAVA = LanguageSpec(
     display_name="Java",
     extensions=(".java",),
     config_files=(),
-    package_files=("pom.xml", "build.gradle", "build.gradle.kts"),
-    test_patterns=("*Test.java", "src/test/java/**/*.java"),
-    source_roots=("src/main/java",),
+    package_files=(
+        "pom.xml",
+        "build.gradle",
+        "build.gradle.kts",
+        "settings.gradle",
+        "settings.gradle.kts",
+    ),
+    test_patterns=("*Test.java", "*Tests.java", "src/test/java/**/*.java"),
+    source_roots=("src/main/java", "src/test/java"),
 )
 
 _KOTLIN = LanguageSpec(
@@ -105,8 +111,8 @@ _KOTLIN = LanguageSpec(
         "settings.gradle",
         "settings.gradle.kts",
     ),
-    test_patterns=("*Test.kt", "src/test/kotlin/**/*.kt"),
-    source_roots=("src/main/kotlin",),
+    test_patterns=("*Test.kt", "*Tests.kt", "src/test/kotlin/**/*.kt"),
+    source_roots=("src/main/kotlin", "src/test/kotlin"),
 )
 
 _CSHARP = LanguageSpec(

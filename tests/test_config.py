@@ -68,6 +68,34 @@ def test_config_detects_typescript_go_and_rust_tooling(tmp_path):
     assert result["rust"]["linter"]["name"] == "clippy"
 
 
+def test_config_detects_java_and_kotlin_project_markers(tmp_path):
+    repo = create_repo(
+        tmp_path,
+        {
+            "pom.xml": "<project/>\n",
+            "build.gradle.kts": "plugins {}\n",
+            "settings.gradle.kts": 'rootProject.name = "demo"\n',
+            "src/main/java/com/acme/App.java": "package com.acme;\nclass App {}\n",
+            "src/test/java/com/acme/AppTest.java": "class AppTest {}\n",
+            "src/main/kotlin/com/acme/Main.kt": "package com.acme\nfun main() {}\n",
+            "src/test/kotlin/com/acme/MainTest.kt": "class MainTest\n",
+        },
+    )
+
+    result = detect(str(repo))
+
+    assert result["java"]["build_tool"] == "maven"
+    assert "pom.xml" in result["java"]["project_markers"]
+    assert "src/main/java" in result["java"]["project_markers"]
+    assert "src/test/java" in result["java"]["project_markers"]
+
+    assert result["kotlin"]["build_tool"] == "gradle"
+    assert "build.gradle.kts" in result["kotlin"]["project_markers"]
+    assert "settings.gradle.kts" in result["kotlin"]["project_markers"]
+    assert "src/main/kotlin" in result["kotlin"]["project_markers"]
+    assert "src/test/kotlin" in result["kotlin"]["project_markers"]
+
+
 def test_config_reports_invalid_repo_paths(tmp_path):
     missing = tmp_path / "missing"
 

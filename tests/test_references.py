@@ -1,3 +1,4 @@
+from unittest import TestCase
 from unittest.mock import patch
 
 from lib.references import (
@@ -30,16 +31,12 @@ def test_reference_source_with_label():
 
 
 def test_reference_source_rejects_empty_value():
-    import pytest
-
-    with pytest.raises(ValueError, match="must not be empty"):
+    with TestCase().assertRaisesRegex(ValueError, "must not be empty"):
         ReferenceSource(kind="local", value="")
 
 
 def test_reference_source_rejects_unsupported_kind():
-    import pytest
-
-    with pytest.raises(ValueError, match="unsupported"):
+    with TestCase().assertRaisesRegex(ValueError, "unsupported"):
         ReferenceSource(kind="inline", value="something")
 
 
@@ -99,19 +96,15 @@ def test_reference_load_result_failure():
 
 
 def test_reference_load_result_rejects_both_set():
-    import pytest
-
     src = ReferenceSource(kind="local", value="../svc")
     doc = ReferenceDocument(source=src, content="content")
-    with pytest.raises(ValueError, match="cannot have both"):
+    with TestCase().assertRaisesRegex(ValueError, "cannot have both"):
         ReferenceLoadResult(source=src, document=doc, error="oops")
 
 
 def test_reference_load_result_rejects_neither_set():
-    import pytest
-
     src = ReferenceSource(kind="local", value="../svc")
-    with pytest.raises(ValueError, match="must have either"):
+    with TestCase().assertRaisesRegex(ValueError, "must have either"):
         ReferenceLoadResult(source=src)
 
 
@@ -143,6 +136,7 @@ def test_reference_metadata_serialization():
             },
         ],
     )
+
     d = meta.to_dict()
     assert d["agentskill_version"] == "0.5.0"
     assert len(d["references"]) == 2
@@ -159,6 +153,7 @@ def test_reference_metadata_preserves_source_ordering():
             {"kind": "local", "value": "../c"},
         ],
     )
+
     d = meta.to_dict()
     assert [s["value"] for s in d["references"]] == ["../a", "../b", "../c"]
 
