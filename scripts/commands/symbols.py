@@ -370,7 +370,9 @@ def _extract_go(files: list[Path]) -> dict:
     method_re = re.compile(r"^func\s+\((\w+)\s+\*?(\w+)\)\s+(\w+)\s*\(")
     type_struct_re = re.compile(r"^type\s+(\w+)\s+struct")
     type_iface_re = re.compile(r"^type\s+(\w+)\s+interface")
-    type_alias_re = re.compile(r"^type\s+(\w+)\s+(?:string|int|float64|bool|error|byte|rune|any)")
+    type_alias_re = re.compile(
+        r"^type\s+(\w+)\s+(?:string|int|float64|bool|error|byte|rune|any)"
+    )
     const_re = re.compile(r"^\s+(\w+)\s*(?:=|[A-Z])")
     var_re = re.compile(r"^var\s+(\w+)")
 

@@ -268,7 +268,7 @@ def _extract_go_imports(source: str) -> list[tuple[str, int]]:
             results.append((single_match.group(1), lineno))
 
     for m in import_block_re.finditer(source):
-        block_start = source[:m.start()].count("\n") + 1
+        block_start = source[: m.start()].count("\n") + 1
         for im in quoted_re.findall(m.group(1)):
             results.append((im, block_start))
 
@@ -323,7 +323,7 @@ def _build_go_graph(files: list[Path], repo: Path) -> dict:
 
         for imp, lineno in _extract_go_imports(source):
             if module_prefix and imp.startswith(module_prefix):
-                internal_path = imp[len(module_prefix):].lstrip("/")
+                internal_path = imp[len(module_prefix) :].lstrip("/")
                 edges.append({"from": pkg, "to": internal_path, "line": lineno})
                 adjacency[pkg].append(internal_path)
 
@@ -347,10 +347,10 @@ def _extract_rust_mods_and_uses(source: str) -> list[tuple[str, int]]:
     )
 
     for m in mod_re.finditer(source):
-        results.append(("mod:" + m.group(1), source[:m.start()].count("\n") + 1))
+        results.append(("mod:" + m.group(1), source[: m.start()].count("\n") + 1))
 
     for m in use_re.finditer(source):
-        results.append(("use:" + m.group(1), source[:m.start()].count("\n") + 1))
+        results.append(("use:" + m.group(1), source[: m.start()].count("\n") + 1))
 
     return results
 
@@ -540,7 +540,9 @@ def build_graph(repo_path: str, lang_filter: str | None = None) -> dict:
     result: dict = {}
 
     langs = (
-        [lang_filter] if lang_filter else ["python", "typescript", "javascript", "go", "rust"]
+        [lang_filter]
+        if lang_filter
+        else ["python", "typescript", "javascript", "go", "rust"]
     )
 
     for lang in langs:

@@ -569,7 +569,9 @@ def _map_go_tests(source_files: list[Path], test_files: list[Path], repo: Path) 
     }
 
 
-def _map_rust_tests(source_files: list[Path], test_files: list[Path], repo: Path) -> dict:
+def _map_rust_tests(
+    source_files: list[Path], test_files: list[Path], repo: Path
+) -> dict:
     mapped: list[dict] = []
     untested: list[str] = []
     unmatched_tests: list[str] = []

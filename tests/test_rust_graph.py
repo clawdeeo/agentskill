@@ -87,7 +87,7 @@ class TestRustGraphIntegration:
         repo = create_repo(
             tmp_path,
             {
-                "Cargo.toml": "[package]\nname = \"demo\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+                "Cargo.toml": '[package]\nname = "demo"\nversion = "0.1.0"\nedition = "2021"\n',
                 "src/lib.rs": "pub mod parser;\nmod config;\n",
                 "src/parser.rs": "pub fn parse() {}\n",
                 "src/config.rs": "fn load() {}\n",
@@ -109,7 +109,7 @@ class TestRustGraphIntegration:
         repo = create_repo(
             tmp_path,
             {
-                "Cargo.toml": "[package]\nname = \"demo\"\n",
+                "Cargo.toml": '[package]\nname = "demo"\n',
                 "src/lib.rs": "use std::collections::HashMap;\n",
             },
         )
