@@ -36,6 +36,21 @@ class AgentsDocument:
     sections: list[AgentsSection]
 
 
+def build_section(
+    heading_text: str,
+    body: str,
+    *,
+    heading_level: int = 2,
+) -> AgentsSection:
+    """Build a section with normalized metadata."""
+    return AgentsSection(
+        heading_text=heading_text,
+        normalized_name="",
+        heading_level=heading_level,
+        body=body,
+    )
+
+
 def _parse_heading(line: str) -> tuple[int, str] | None:
     raw_line = line.rstrip("\r\n")
     match = ATX_HEADING_RE.match(raw_line)
@@ -67,11 +82,10 @@ def parse_agents_document(text: str) -> AgentsDocument:
 
         if current_heading is not None:
             sections.append(
-                AgentsSection(
-                    heading_text=current_heading[1],
-                    normalized_name="",
+                build_section(
+                    current_heading[1],
+                    "".join(body_lines),
                     heading_level=current_heading[0],
-                    body="".join(body_lines),
                 )
             )
 
@@ -82,11 +96,10 @@ def parse_agents_document(text: str) -> AgentsDocument:
         return AgentsDocument(preamble="".join(preamble_lines), sections=[])
 
     sections.append(
-        AgentsSection(
-            heading_text=current_heading[1],
-            normalized_name="",
+        build_section(
+            current_heading[1],
+            "".join(body_lines),
             heading_level=current_heading[0],
-            body="".join(body_lines),
         )
     )
 
