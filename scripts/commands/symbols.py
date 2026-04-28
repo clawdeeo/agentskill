@@ -476,6 +476,12 @@ def _strip_jvm_comments(source: str) -> str:
     return source
 
 
+def _strip_c_family_comments(source: str) -> str:
+    source = re.sub(r"//.*", "", source)
+    source = re.sub(r"/\*.*?\*/", "", source, flags=re.DOTALL)
+    return source
+
+
 def _extract_java(files: list[Path]) -> dict:
     decl_re = re.compile(
         r"^\s*(?P<mods>(?:public|private|protected|static|final|abstract)\s+)*"
@@ -652,6 +658,206 @@ def _extract_kotlin(files: list[Path]) -> dict:
     return result
 
 
+def _extract_csharp(files: list[Path]) -> dict:
+    type_re = re.compile(
+        r"^\s*(?:public|private|protected|internal)?\s*(?:abstract\s+|static\s+|sealed\s+|partial\s+)?"
+        r"(class|interface|struct|enum|record)\s+([A-Za-z_]\w*)",
+        re.MULTILINE,
+    )
+
+    method_re = re.compile(
+        r"^\s*(?:public|private|protected|internal)\s+(?:static\s+|virtual\s+|override\s+|async\s+)?"
+        r"[\w<>\[\], ?]+\s+([A-Za-z_]\w*)\s*\(",
+        re.MULTILINE,
+    )
+
+    classes: list[str] = []
+    interfaces: list[str] = []
+    structs: list[str] = []
+    enums: list[str] = []
+    records: list[str] = []
+    methods: list[str] = []
+    file_names: list[str] = []
+
+    for fpath in files:
+        file_names.append(fpath.stem)
+
+        try:
+            source = _strip_c_family_comments(read_text(fpath))
+        except Exception:
+            continue
+
+        for kind, name in type_re.findall(source):
+            if kind == "class":
+                classes.append(name)
+            elif kind == "interface":
+                interfaces.append(name)
+            elif kind == "struct":
+                structs.append(name)
+            elif kind == "enum":
+                enums.append(name)
+            elif kind == "record":
+                records.append(name)
+
+        for name in method_re.findall(source):
+            if name not in {"if", "for", "while", "switch", "catch", "foreach"}:
+                methods.append(name)
+
+    result: dict = {
+        "classes": _pattern_summary(classes),
+        "methods": _pattern_summary(methods),
+        "files": _pattern_summary(file_names),
+    }
+
+    if interfaces:
+        result["interfaces"] = _pattern_summary(interfaces)
+
+    if structs:
+        result["structs"] = _pattern_summary(structs)
+
+    if enums:
+        result["enums"] = _pattern_summary(enums)
+
+    if records:
+        result["records"] = _pattern_summary(records)
+
+    return result
+
+
+def _extract_c(files: list[Path]) -> dict:
+    source_files = [f for f in files if f.suffix.lower() == ".c"]
+    all_files = files if source_files else files
+
+    function_re = re.compile(
+        r"^\s*(?!if\b|for\b|while\b|switch\b|return\b)(?:[A-Za-z_][\w\s\*]+)\s+([A-Za-z_]\w*)\s*\([^;]*\)\s*\{",
+        re.MULTILINE,
+    )
+
+    struct_re = re.compile(r"^\s*struct\s+([A-Za-z_]\w*)\s*\{", re.MULTILINE)
+    enum_re = re.compile(r"^\s*enum\s+([A-Za-z_]\w*)\s*\{", re.MULTILINE)
+
+    typedef_re = re.compile(
+        r"^\s*typedef\s+(?:struct|enum|union)?\s*[A-Za-z_]*\s*([A-Za-z_]\w*)\s*;",
+        re.MULTILINE,
+    )
+
+    macro_re = re.compile(r"^\s*#define\s+([A-Z_][A-Z0-9_]*)\b", re.MULTILINE)
+
+    functions: list[str] = []
+    structs: list[str] = []
+    enums: list[str] = []
+    typedefs: list[str] = []
+    macros: list[str] = []
+    file_names: list[str] = []
+
+    for fpath in all_files:
+        file_names.append(fpath.stem)
+
+        try:
+            source = _strip_c_family_comments(read_text(fpath))
+        except Exception:
+            continue
+
+        if fpath.suffix.lower() == ".c":
+            functions.extend(function_re.findall(source))
+
+        structs.extend(struct_re.findall(source))
+        enums.extend(enum_re.findall(source))
+        typedefs.extend(typedef_re.findall(source))
+        macros.extend(macro_re.findall(source))
+
+    result: dict = {
+        "functions": _pattern_summary(functions),
+        "files": _pattern_summary(file_names),
+    }
+
+    if structs:
+        result["structs"] = _pattern_summary(structs)
+
+    if enums:
+        result["enums"] = _pattern_summary(enums)
+
+    if typedefs:
+        result["typedefs"] = _pattern_summary(typedefs)
+
+    if macros:
+        result["macros"] = _pattern_summary(macros)
+
+    return result
+
+
+def _extract_cpp(files: list[Path]) -> dict:
+    source_files = [
+        f
+        for f in files
+        if f.suffix.lower() in {".cpp", ".cc", ".cxx", ".hpp", ".hh", ".hxx"}
+    ]
+
+    namespace_re = re.compile(r"^\s*namespace\s+([A-Za-z_]\w*)\s*\{", re.MULTILINE)
+
+    template_re = re.compile(
+        r"^\s*template\s*<[^>]+>\s*(?:class|struct)?\s*([A-Za-z_]\w*)?",
+        re.MULTILINE,
+    )
+
+    class_re = re.compile(r"^\s*class\s+([A-Za-z_]\w*)", re.MULTILINE)
+    struct_re = re.compile(r"^\s*struct\s+([A-Za-z_]\w*)", re.MULTILINE)
+    enum_re = re.compile(r"^\s*enum(?:\s+class)?\s+([A-Za-z_]\w*)", re.MULTILINE)
+
+    function_re = re.compile(
+        r"^\s*(?!if\b|for\b|while\b|switch\b|return\b)(?:[A-Za-z_][\w:\s<>\*&]+)\s+([A-Za-z_]\w*)\s*\([^;]*\)\s*\{",
+        re.MULTILINE,
+    )
+
+    namespaces: list[str] = []
+    classes: list[str] = []
+    structs: list[str] = []
+    enums: list[str] = []
+    functions: list[str] = []
+    templates: list[str] = []
+    file_names: list[str] = []
+
+    for fpath in source_files:
+        file_names.append(fpath.stem)
+
+        try:
+            source = _strip_c_family_comments(read_text(fpath))
+        except Exception:
+            continue
+
+        namespaces.extend(namespace_re.findall(source))
+        classes.extend(class_re.findall(source))
+        structs.extend(struct_re.findall(source))
+        enums.extend(enum_re.findall(source))
+        functions.extend(function_re.findall(source))
+
+        for name in template_re.findall(source):
+            if name:
+                templates.append(name)
+
+    result: dict = {
+        "functions": _pattern_summary(functions),
+        "files": _pattern_summary(file_names),
+    }
+
+    if namespaces:
+        result["namespaces"] = _pattern_summary(namespaces)
+
+    if classes:
+        result["classes"] = _pattern_summary(classes)
+
+    if structs:
+        result["structs"] = _pattern_summary(structs)
+
+    if enums:
+        result["enums"] = _pattern_summary(enums)
+
+    if templates:
+        result["templates"] = _pattern_summary(templates)
+
+    return result
+
+
 def _extract_rust(files: list[Path]) -> dict:
     func_re = re.compile(r"^\s*(?:pub\s+)?(?:async\s+)?fn\s+(\w+)", re.MULTILINE)
     struct_re = re.compile(r"^\s*(?:pub\s+)?struct\s+(\w+)", re.MULTILINE)
@@ -760,6 +966,15 @@ def extract_symbols(repo_path: str, lang_filter: str | None = None) -> dict:
 
     if not lang_filter or lang_filter == "kotlin":
         _run("kotlin", [".kt", ".kts"], _extract_kotlin)
+
+    if not lang_filter or lang_filter == "csharp":
+        _run("csharp", [".cs"], _extract_csharp)
+
+    if not lang_filter or lang_filter == "c":
+        _run("c", [".c", ".h"], _extract_c)
+
+    if not lang_filter or lang_filter == "cpp":
+        _run("cpp", [".cpp", ".cc", ".cxx", ".hpp", ".hh", ".hxx"], _extract_cpp)
 
     return result
 

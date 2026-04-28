@@ -1,6 +1,5 @@
 """Shared TOML and YAML parser loading with optional dependency fallback."""
 
-import importlib
 from typing import Any
 
 
@@ -79,7 +78,7 @@ def _resolve_yaml():
     _yaml_checked = True
 
     try:
-        _yaml_module = importlib.import_module("yaml")
+        _yaml_module = __import__("yaml")
         return _yaml_module
     except ImportError:
         pass

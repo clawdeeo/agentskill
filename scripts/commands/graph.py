@@ -456,6 +456,12 @@ def _strip_jvm_comments(source: str) -> str:
     return source
 
 
+def _strip_c_family_comments(source: str) -> str:
+    source = re.sub(r"//.*", "", source)
+    source = re.sub(r"/\*.*?\*/", "", source, flags=re.DOTALL)
+    return source
+
+
 def _extract_jvm_package(content: str) -> str | None:
     stripped = _strip_jvm_comments(content)
 
@@ -569,6 +575,206 @@ def _build_jvm_graph(files: list[Path], repo: Path) -> dict:
     return _graph_result(sorted(adjacency.keys()), edges, adjacency, parse_errors)
 
 
+def _extract_csharp_namespace(content: str) -> str | None:
+    stripped = _strip_c_family_comments(content)
+
+    match = re.search(
+        r"^\s*namespace\s+([A-Za-z_][\w.]*)\s*(?:;|\{)",
+        stripped,
+        re.MULTILINE,
+    )
+
+    return match.group(1) if match else None
+
+
+def _extract_csharp_usings(content: str) -> list[tuple[str, int]]:
+    stripped = _strip_c_family_comments(content)
+    results: list[tuple[str, int]] = []
+
+    pattern = re.compile(
+        r"^\s*using\s+(?:static\s+)?([A-Za-z_][\w.]*)\s*;",
+        re.MULTILINE,
+    )
+
+    for match in pattern.finditer(stripped):
+        results.append((match.group(1), stripped[: match.start()].count("\n") + 1))
+
+    return results
+
+
+def _build_csharp_index(
+    files: list[Path], repo: Path
+) -> tuple[dict[str, str], dict[str, set[str]]]:
+    symbol_index: dict[str, str] = {}
+    namespace_index: dict[str, set[str]] = {}
+
+    for fpath in files:
+        rel = str(fpath.relative_to(repo))
+
+        try:
+            source = read_text(fpath)
+        except Exception:
+            continue
+
+        namespace_name = _extract_csharp_namespace(source)
+
+        if namespace_name:
+            namespace_index.setdefault(namespace_name, set()).add(rel)
+            symbol_index[f"{namespace_name}.{fpath.stem}"] = rel
+        else:
+            symbol_index[fpath.stem] = rel
+
+    return symbol_index, namespace_index
+
+
+def _resolve_csharp_using(
+    using_name: str,
+    symbol_index: dict[str, str],
+    namespace_index: dict[str, set[str]],
+) -> str | None:
+    if using_name in symbol_index:
+        return symbol_index[using_name]
+
+    matches = namespace_index.get(using_name)
+
+    if matches and len(matches) == 1:
+        return next(iter(matches))
+
+    for namespace_name, files in namespace_index.items():
+        if using_name.startswith(namespace_name + ".") and len(files) == 1:
+            return next(iter(files))
+
+    return None
+
+
+def _build_csharp_graph(files: list[Path], repo: Path) -> dict:
+    edges: list[dict] = []
+    adjacency: dict[str, list[str]] = {}
+    parse_errors: list[str] = []
+    symbol_index, namespace_index = _build_csharp_index(files, repo)
+
+    for fpath in files:
+        rel = str(fpath.relative_to(repo))
+        adjacency.setdefault(rel, [])
+
+        try:
+            source = read_text(fpath)
+        except Exception:
+            parse_errors.append(rel)
+            continue
+
+        for using_name, lineno in _extract_csharp_usings(source):
+            resolved = _resolve_csharp_using(using_name, symbol_index, namespace_index)
+
+            if resolved and resolved != rel:
+                edges.append({"from": rel, "to": resolved, "line": lineno})
+                adjacency[rel].append(resolved)
+
+    return _graph_result(sorted(adjacency.keys()), edges, adjacency, parse_errors)
+
+
+def _extract_c_cpp_includes(content: str) -> list[tuple[str, str, int]]:
+    stripped = _strip_c_family_comments(content)
+    results: list[tuple[str, str, int]] = []
+    pattern = re.compile(r'^\s*#include\s*([<"])([^>"]+)[>"]', re.MULTILINE)
+
+    for match in pattern.finditer(stripped):
+        delim = match.group(1)
+        include_name = match.group(2).strip()
+        line = stripped[: match.start()].count("\n") + 1
+        results.append((include_name, delim, line))
+
+    return results
+
+
+def _build_include_lookup(repo: Path) -> dict[str, str]:
+    lookup: dict[str, str] = {}
+
+    for dirpath, dirs, files in os.walk(repo):
+        dirs[:] = [d for d in dirs if not should_skip_dir(d)]
+
+        for fn in files:
+            fpath = Path(dirpath) / fn
+            rel = str(fpath.relative_to(repo))
+            posix_rel = Path(rel).as_posix()
+            key = posix_rel.lower()
+            lookup.setdefault(key, rel)
+            lookup.setdefault(fpath.name.lower(), rel)
+
+            parts = fpath.parts
+            for root_name in ("include", "src", "lib"):
+                if root_name in parts:
+                    idx = parts.index(root_name)
+                    subpath = Path(*parts[idx + 1 :]).as_posix().lower()
+
+                    if subpath:
+                        lookup.setdefault(subpath, rel)
+
+    return lookup
+
+
+def _resolve_c_cpp_include(
+    importer: Path,
+    include_name: str,
+    repo: Path,
+    include_lookup: dict[str, str],
+) -> str | None:
+    normalized = Path(include_name).as_posix().lower()
+
+    path_candidates = [
+        importer.parent / include_name,
+        repo / include_name,
+        repo / "include" / include_name,
+        repo / "src" / include_name,
+        repo / "lib" / include_name,
+    ]
+
+    for candidate_path in path_candidates:
+        if candidate_path.exists():
+            try:
+                return str(candidate_path.resolve().relative_to(repo.resolve()))
+            except ValueError:
+                continue
+
+    candidates: list[str] = [normalized]
+
+    candidates.extend(
+        [f"include/{normalized}", f"src/{normalized}", f"lib/{normalized}"]
+    )
+
+    for candidate in candidates:
+        if candidate in include_lookup:
+            return include_lookup[candidate]
+
+    return None
+
+
+def _build_c_cpp_graph(files: list[Path], repo: Path) -> dict:
+    edges: list[dict] = []
+    adjacency: dict[str, list[str]] = {}
+    parse_errors: list[str] = []
+    include_lookup = _build_include_lookup(repo)
+
+    for fpath in files:
+        rel = str(fpath.relative_to(repo))
+        adjacency.setdefault(rel, [])
+
+        try:
+            source = read_text(fpath)
+        except Exception:
+            parse_errors.append(rel)
+            continue
+
+        for include_name, _delim, lineno in _extract_c_cpp_includes(source):
+            resolved = _resolve_c_cpp_include(fpath, include_name, repo, include_lookup)
+
+            if resolved and resolved != rel:
+                edges.append({"from": rel, "to": resolved, "line": lineno})
+                adjacency[rel].append(resolved)
+
+    return _graph_result(sorted(adjacency.keys()), edges, adjacency, parse_errors)
+
+
 def _compute_most_depended(
     adjacency: dict[str, list[str]],
 ) -> list[dict[str, str | int]]:
@@ -668,7 +874,18 @@ def build_graph(repo_path: str, lang_filter: str | None = None) -> dict:
     langs = (
         [lang_filter]
         if lang_filter
-        else ["python", "typescript", "javascript", "go", "rust", "java", "kotlin"]
+        else [
+            "python",
+            "typescript",
+            "javascript",
+            "go",
+            "rust",
+            "java",
+            "kotlin",
+            "csharp",
+            "c",
+            "cpp",
+        ]
     )
 
     for lang in langs:
@@ -688,6 +905,10 @@ def build_graph(repo_path: str, lang_filter: str | None = None) -> dict:
                 result[lang] = _build_rust_graph(files, repo)
             elif lang in ("java", "kotlin"):
                 result[lang] = _build_jvm_graph(files, repo)
+            elif lang == "csharp":
+                result[lang] = _build_csharp_graph(files, repo)
+            elif lang in ("c", "cpp"):
+                result[lang] = _build_c_cpp_graph(files, repo)
         except Exception as exc:
             result[lang] = {"error": str(exc)}
 

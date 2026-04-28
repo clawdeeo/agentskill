@@ -114,6 +114,63 @@ def test_symbols_extracts_java_and_kotlin(tmp_path):
     assert result["kotlin"]["properties"]["total"] >= 1
 
 
+def test_symbols_extracts_csharp_c_and_cpp(tmp_path):
+    repo = create_repo(
+        tmp_path,
+        {
+            "src/UserService.cs": (
+                "namespace Acme.Service;\n\n"
+                "public class UserService {\n"
+                "    public void Start() {}\n"
+                '    private string Normalize() { return ""; }\n'
+                "}\n\n"
+                "public interface IUserStore {}\n"
+                "internal struct UserId {}\n"
+                "public enum Status {}\n"
+                "public record User(string Id);\n"
+            ),
+            "src/main.c": (
+                "#define MAX_SIZE 100\n\n"
+                "typedef struct User User;\n"
+                "struct User {};\n\n"
+                "enum Status { OK };\n\n"
+                "int add(int a, int b) {\n    return a + b;\n}\n"
+            ),
+            "src/app.cpp": (
+                "namespace acme {}\n\n"
+                "template <typename T>\n"
+                "class Box {};\n"
+                "class UserService {};\n"
+                "struct User {};\n"
+                "enum class Status {};\n\n"
+                "int add(int a, int b) {\n    return a + b;\n}\n"
+            ),
+        },
+    )
+
+    result = extract_symbols(str(repo))
+
+    assert result["csharp"]["classes"]["total"] >= 1
+    assert result["csharp"]["methods"]["total"] >= 2
+    assert result["csharp"]["interfaces"]["total"] >= 1
+    assert result["csharp"]["structs"]["total"] >= 1
+    assert result["csharp"]["enums"]["total"] >= 1
+    assert result["csharp"]["records"]["total"] >= 1
+
+    assert result["c"]["functions"]["total"] >= 1
+    assert result["c"]["structs"]["total"] >= 1
+    assert result["c"]["enums"]["total"] >= 1
+    assert result["c"]["typedefs"]["total"] >= 1
+    assert result["c"]["macros"]["total"] >= 1
+
+    assert result["cpp"]["functions"]["total"] >= 1
+    assert result["cpp"]["namespaces"]["total"] >= 1
+    assert result["cpp"]["classes"]["total"] >= 2
+    assert result["cpp"]["structs"]["total"] >= 1
+    assert result["cpp"]["enums"]["total"] >= 1
+    assert result["cpp"]["templates"]["total"] >= 1
+
+
 def test_symbols_reports_invalid_repo_paths(tmp_path):
     missing = tmp_path / "missing"
 

@@ -147,6 +147,9 @@ def _parse_editorconfig_for_lang(sections: dict, lang: str) -> dict:
         "rust": ["*.rs"],
         "java": ["*.java"],
         "kotlin": ["*.kt", "*.kts"],
+        "csharp": ["*.cs"],
+        "c": ["*.c", "*.h"],
+        "cpp": ["*.cpp", "*.cc", "*.cxx", "*.hpp", "*.hh", "*.hxx"],
         "ruby": ["*.rb"],
     }
 
@@ -445,6 +448,62 @@ def _detect_jvm_markers(repo: Path, language: str) -> dict:
     }
 
 
+def _detect_csharp_markers(repo: Path) -> dict:
+    markers: list[str] = []
+
+    for pattern in (
+        "*.csproj",
+        "*.sln",
+        "Directory.Build.props",
+        "Directory.Build.targets",
+    ):
+        if "*" in pattern:
+            markers.extend(sorted(path.name for path in repo.rglob(pattern)))
+        elif (repo / pattern).exists():
+            markers.append(pattern)
+
+    if not markers:
+        return {}
+
+    return {
+        "project_markers": sorted(set(markers)),
+        "build_tool": "msbuild",
+    }
+
+
+def _detect_c_family_markers(repo: Path, language: str) -> dict:
+    markers: list[str] = []
+
+    for marker in ("CMakeLists.txt", "Makefile", "makefile", "GNUmakefile"):
+        if (repo / marker).exists():
+            markers.append(marker)
+
+    cmake_files = sorted(path.name for path in repo.rglob("*.cmake"))
+
+    if cmake_files:
+        markers.extend(cmake_files)
+
+    vcxproj_files = sorted(path.name for path in repo.rglob("*.vcxproj"))
+
+    if vcxproj_files:
+        markers.extend(vcxproj_files)
+
+    if not markers:
+        return {}
+
+    build_tool = None
+
+    if "CMakeLists.txt" in markers or cmake_files:
+        build_tool = "cmake"
+    elif any(marker in markers for marker in ("Makefile", "makefile", "GNUmakefile")):
+        build_tool = "make"
+
+    return {
+        "project_markers": sorted(set(markers)),
+        "build_tool": build_tool,
+    }
+
+
 def _attach_editorconfig(lang_result: dict, ec_sections: dict, lang: str) -> None:
     """Mutate lang_result in place: attach editorconfig entry if one exists."""
     ec = _parse_editorconfig_for_lang(ec_sections, lang)
@@ -507,6 +566,29 @@ def detect(repo_path: str) -> dict:
     if kotlin or list(repo.rglob("*.kt")) or list(repo.rglob("*.kts")):
         _attach_editorconfig(kotlin, ec_sections, "kotlin")
         result["kotlin"] = kotlin
+
+    csharp = _detect_csharp_markers(repo)
+
+    if csharp or list(repo.rglob("*.cs")):
+        _attach_editorconfig(csharp, ec_sections, "csharp")
+        result["csharp"] = csharp
+
+    c_lang = _detect_c_family_markers(repo, "c")
+
+    if c_lang or list(repo.rglob("*.c")) or list(repo.rglob("*.h")):
+        _attach_editorconfig(c_lang, ec_sections, "c")
+        result["c"] = c_lang
+
+    cpp = _detect_c_family_markers(repo, "cpp")
+
+    if (
+        cpp
+        or list(repo.rglob("*.cpp"))
+        or list(repo.rglob("*.cc"))
+        or list(repo.rglob("*.cxx"))
+    ):
+        _attach_editorconfig(cpp, ec_sections, "cpp")
+        result["cpp"] = cpp
 
     if ec_sections:
         result["editorconfig"] = ec_sections

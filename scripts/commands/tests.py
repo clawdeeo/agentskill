@@ -33,6 +33,13 @@ FRAMEWORK_RUN_DEFAULTS = {
     "jest": "jest",
     "vitest": "vitest",
     "mocha": "mocha",
+    "xunit": "dotnet test",
+    "nunit": "dotnet test",
+    "mstest": "dotnet test",
+    "gtest": "ctest",
+    "catch2": "ctest",
+    "unity": "ctest",
+    "cmocka": "ctest",
 }
 
 TOP_LEVEL_TEST_DIRS = {"tests", "test", "__tests__", "spec"}
@@ -45,6 +52,25 @@ JVM_TEST_FRAMEWORKS = {
     "org.junit.jupiter.params.ParameterizedTest": "junit",
     "org.testng.annotations.Test": "testng",
     "kotlin.test": "kotlin-test",
+}
+
+CSHARP_TEST_FRAMEWORKS = {
+    "using Xunit;": "xunit",
+    "using NUnit.Framework;": "nunit",
+    "using Microsoft.VisualStudio.TestTools.UnitTesting;": "mstest",
+    "[Fact]": "xunit",
+    "[Theory]": "xunit",
+    "[TestCase]": "nunit",
+    "[TestMethod]": "mstest",
+}
+
+C_CPP_TEST_FRAMEWORKS = {
+    "gtest/gtest.h": "gtest",
+    "TEST(": "gtest",
+    "catch2/catch_test_macros.hpp": "catch2",
+    "TEST_CASE(": "catch2",
+    "unity.h": "unity",
+    "cmocka.h": "cmocka",
 }
 
 
@@ -557,6 +583,72 @@ def _collect_jvm_files(
     return test_files, source_files
 
 
+def _collect_csharp_files(repo: Path) -> tuple[list[Path], list[Path]]:
+    test_files: list[Path] = []
+    source_files: list[Path] = []
+
+    for dirpath, dirs, files in os.walk(repo):
+        dirs[:] = [d for d in dirs if not should_skip_dir(d)]
+
+        for fn in files:
+            if not fn.endswith(".cs"):
+                continue
+
+            fpath = Path(dirpath) / fn
+            rel = str(fpath.relative_to(repo))
+            parts = {part.lower() for part in fpath.parent.parts}
+
+            if (
+                is_test_path(rel, language_id="csharp")
+                or "tests" in parts
+                or "test" in parts
+                or any(part.endswith(".tests") for part in parts)
+            ):
+                test_files.append(fpath)
+            else:
+                source_files.append(fpath)
+
+    return test_files, source_files
+
+
+def _collect_c_family_files(
+    repo: Path, language_id: str
+) -> tuple[list[Path], list[Path]]:
+    test_files: list[Path] = []
+    source_files: list[Path] = []
+    source_exts = {
+        "c": {".c"},
+        "cpp": {".cpp", ".cc", ".cxx"},
+    }
+
+    for dirpath, dirs, files in os.walk(repo):
+        dirs[:] = [d for d in dirs if not should_skip_dir(d)]
+
+        for fn in files:
+            fpath = Path(dirpath) / fn
+            spec = language_for_path(fpath)
+
+            if not spec or spec.id != language_id:
+                continue
+
+            if fpath.suffix.lower() not in source_exts[language_id]:
+                continue
+
+            rel = str(fpath.relative_to(repo))
+            parts = {part.lower() for part in fpath.parent.parts}
+
+            if (
+                is_test_path(rel, language_id=language_id)
+                or "tests" in parts
+                or "test" in parts
+            ):
+                test_files.append(fpath)
+            else:
+                source_files.append(fpath)
+
+    return test_files, source_files
+
+
 def _detect_go_framework(repo: Path) -> str:
     return "go test"
 
@@ -580,6 +672,37 @@ def _detect_jvm_framework(test_files: list[Path]) -> str:
             return "junit"
 
     return "junit"
+
+
+def _detect_csharp_framework(test_files: list[Path]) -> str:
+    for fpath in test_files[:FRAMEWORK_DETECTION_SAMPLE]:
+        try:
+            content = read_text(fpath)
+        except Exception:
+            continue
+
+        for marker, framework in CSHARP_TEST_FRAMEWORKS.items():
+            if marker in content:
+                return framework
+
+        if "[Test]" in content:
+            return "nunit"
+
+    return "xunit"
+
+
+def _detect_c_cpp_framework(test_files: list[Path]) -> str:
+    for fpath in test_files[:FRAMEWORK_DETECTION_SAMPLE]:
+        try:
+            content = read_text(fpath)
+        except Exception:
+            continue
+
+        for marker, framework in C_CPP_TEST_FRAMEWORKS.items():
+            if marker in content:
+                return framework
+
+    return "ctest"
 
 
 def _map_go_tests(source_files: list[Path], test_files: list[Path], repo: Path) -> dict:
@@ -736,6 +859,51 @@ def _map_jvm_tests(
     }
 
 
+def _map_stem_tests(
+    source_files: list[Path], test_files: list[Path], repo: Path
+) -> dict:
+    mapped: list[dict] = []
+    untested: list[str] = []
+    unmatched_tests: list[str] = []
+    source_by_stem: dict[str, Path] = {}
+    matched_tests: set[str] = set()
+
+    for sf in source_files:
+        source_by_stem[sf.stem.lower()] = sf
+
+    for tf in test_files:
+        stem = tf.stem.lower()
+        candidate = re.sub(r"([_.-](test|tests|spec))$", "", stem)
+        candidate = re.sub(r"(tests?|spec)$", "", candidate)
+        candidate = re.sub(r"^(test[_.-]?)", "", candidate)
+        candidate = re.sub(r"([_.-](test|tests|spec))$", "", candidate)
+        match = source_by_stem.get(candidate)
+
+        if match:
+            matched_tests.add(str(match.relative_to(repo)))
+
+            mapped.append(
+                {
+                    "source": str(match.relative_to(repo)),
+                    "test": str(tf.relative_to(repo)),
+                }
+            )
+        else:
+            unmatched_tests.append(str(tf.relative_to(repo)))
+
+    for sf in source_files:
+        rel = str(sf.relative_to(repo))
+
+        if rel not in matched_tests:
+            untested.append(rel)
+
+    return {
+        "mapped": mapped,
+        "untested_source_files": untested,
+        "test_files_without_source_match": unmatched_tests,
+    }
+
+
 def _analyze_go(repo: Path) -> dict | None:
     test_files, source_files = _collect_go_files(repo)
 
@@ -844,6 +1012,87 @@ def _analyze_kotlin(repo: Path) -> dict | None:
     }
 
 
+def _analyze_csharp(repo: Path) -> dict | None:
+    test_files, source_files = _collect_csharp_files(repo)
+
+    if not test_files and not source_files:
+        return None
+
+    framework = _detect_csharp_framework(test_files)
+    run_cmd = _extract_run_command(repo, framework) or framework
+    coverage = _map_stem_tests(source_files, test_files, repo)
+    structure = _detect_test_structure(repo, test_files)
+    naming = _detect_naming_patterns(test_files)
+    rep_test = _pick_representative(test_files)
+
+    return {
+        "framework": framework,
+        "run_command": run_cmd,
+        "test_files": len(test_files),
+        "source_files": len(source_files),
+        "coverage_shape": coverage,
+        "structure": structure,
+        "naming": naming,
+        "representative_test": str(Path(rep_test).relative_to(repo))
+        if rep_test
+        else None,
+    }
+
+
+def _analyze_c(repo: Path) -> dict | None:
+    test_files, source_files = _collect_c_family_files(repo, "c")
+
+    if not test_files and not source_files:
+        return None
+
+    framework = _detect_c_cpp_framework(test_files)
+    run_cmd = _extract_run_command(repo, framework) or framework
+    coverage = _map_stem_tests(source_files, test_files, repo)
+    structure = _detect_test_structure(repo, test_files)
+    naming = _detect_naming_patterns(test_files)
+    rep_test = _pick_representative(test_files)
+
+    return {
+        "framework": framework,
+        "run_command": run_cmd,
+        "test_files": len(test_files),
+        "source_files": len(source_files),
+        "coverage_shape": coverage,
+        "structure": structure,
+        "naming": naming,
+        "representative_test": str(Path(rep_test).relative_to(repo))
+        if rep_test
+        else None,
+    }
+
+
+def _analyze_cpp(repo: Path) -> dict | None:
+    test_files, source_files = _collect_c_family_files(repo, "cpp")
+
+    if not test_files and not source_files:
+        return None
+
+    framework = _detect_c_cpp_framework(test_files)
+    run_cmd = _extract_run_command(repo, framework) or framework
+    coverage = _map_stem_tests(source_files, test_files, repo)
+    structure = _detect_test_structure(repo, test_files)
+    naming = _detect_naming_patterns(test_files)
+    rep_test = _pick_representative(test_files)
+
+    return {
+        "framework": framework,
+        "run_command": run_cmd,
+        "test_files": len(test_files),
+        "source_files": len(source_files),
+        "coverage_shape": coverage,
+        "structure": structure,
+        "naming": naming,
+        "representative_test": str(Path(rep_test).relative_to(repo))
+        if rep_test
+        else None,
+    }
+
+
 def analyze_tests(repo_path: str) -> dict:
     try:
         repo = validate_repo(repo_path)
@@ -899,6 +1148,30 @@ def analyze_tests(repo_path: str) -> dict:
             result["kotlin"] = kotlin
     except Exception as exc:
         result["kotlin"] = {"error": str(exc)}
+
+    try:
+        csharp = _analyze_csharp(repo)
+
+        if csharp:
+            result["csharp"] = csharp
+    except Exception as exc:
+        result["csharp"] = {"error": str(exc)}
+
+    try:
+        c_lang = _analyze_c(repo)
+
+        if c_lang:
+            result["c"] = c_lang
+    except Exception as exc:
+        result["c"] = {"error": str(exc)}
+
+    try:
+        cpp = _analyze_cpp(repo)
+
+        if cpp:
+            result["cpp"] = cpp
+    except Exception as exc:
+        result["cpp"] = {"error": str(exc)}
 
     return result
 

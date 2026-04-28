@@ -93,6 +93,54 @@ def test_graph_detects_java_and_kotlin_internal_imports(tmp_path):
     } in result["kotlin"]["edges"]
 
 
+def test_graph_detects_csharp_and_c_family_internal_edges(tmp_path):
+    repo = create_repo(
+        tmp_path,
+        {
+            "src/App.cs": (
+                "using System;\n"
+                "using Acme.Service.Core;\n\n"
+                "namespace Acme.Service;\n\n"
+                "public class App {}\n"
+            ),
+            "src/Core/UserService.cs": (
+                "namespace Acme.Service.Core;\n\npublic class UserService {}\n"
+            ),
+            "src/main.c": (
+                '#include "util.h"\n'
+                '#include "../include/project/config.h"\n'
+                "#include <stdio.h>\n"
+            ),
+            "src/util.h": "int add(int a, int b);\n",
+            "include/project/config.h": '#define APP_NAME "demo"\n',
+            "src/app.cpp": '#include "project/service.hpp"\n#include <vector>\n',
+            "include/project/service.hpp": "class UserService {};\n",
+        },
+    )
+
+    result = build_graph(str(repo))
+
+    assert {
+        "from": "src/App.cs",
+        "to": "src/Core/UserService.cs",
+        "line": 2,
+    } in result["csharp"]["edges"]
+
+    assert {"from": "src/main.c", "to": "src/util.h", "line": 1} in result["c"]["edges"]
+
+    assert {
+        "from": "src/main.c",
+        "to": "include/project/config.h",
+        "line": 2,
+    } in result["c"]["edges"]
+
+    assert {
+        "from": "src/app.cpp",
+        "to": "include/project/service.hpp",
+        "line": 1,
+    } in result["cpp"]["edges"]
+
+
 def test_graph_reports_invalid_repo_paths(tmp_path):
     missing = tmp_path / "missing"
 

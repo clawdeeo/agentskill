@@ -5,6 +5,7 @@ from commands.tests import (
     _find_conftest_files,
     _map_jvm_tests,
     _map_python_tests,
+    _map_stem_tests,
     analyze_tests,
 )
 from test_support import create_repo, create_sample_repo, write
@@ -158,6 +159,63 @@ def test_map_jvm_tests_reports_untested_sources(tmp_path):
         }
     ]
     assert mapping["untested_source_files"] == ["src/main/java/com/acme/Helper.java"]
+
+
+def test_tests_detect_csharp_and_c_family_mappings(tmp_path):
+    repo = create_repo(
+        tmp_path,
+        {
+            "src/UserService.cs": "public class UserService {}\n",
+            "tests/UserServiceTests.cs": (
+                "using Xunit;\n\n"
+                "public class UserServiceTests {\n"
+                "    [Fact]\n"
+                "    public void Starts() {}\n"
+                "}\n"
+            ),
+            "src/foo.c": "int add(int a, int b) { return a + b; }\n",
+            "tests/foo_test.c": '#include "unity.h"\n',
+            "src/bar.cpp": "int add(int a, int b) { return a + b; }\n",
+            "tests/bar_test.cpp": "#include <gtest/gtest.h>\nTEST(BarTest, Works) {}\n",
+        },
+    )
+
+    result = analyze_tests(str(repo))
+
+    assert result["csharp"]["framework"] == "xunit"
+    assert result["csharp"]["coverage_shape"]["mapped"] == [
+        {"source": "src/UserService.cs", "test": "tests/UserServiceTests.cs"}
+    ]
+
+    assert result["c"]["framework"] == "unity"
+    assert result["c"]["coverage_shape"]["mapped"] == [
+        {"source": "src/foo.c", "test": "tests/foo_test.c"}
+    ]
+
+    assert result["cpp"]["framework"] == "gtest"
+    assert result["cpp"]["coverage_shape"]["mapped"] == [
+        {"source": "src/bar.cpp", "test": "tests/bar_test.cpp"}
+    ]
+
+
+def test_map_stem_tests_reports_untested_sources(tmp_path):
+    repo = create_repo(
+        tmp_path,
+        {
+            "src/foo.c": "int add(int a, int b) { return a + b; }\n",
+            "src/helper.c": "int helper(void) { return 1; }\n",
+            "tests/foo_test.c": "void test_add(void) {}\n",
+        },
+    )
+
+    mapping = _map_stem_tests(
+        [repo / "src/foo.c", repo / "src/helper.c"],
+        [repo / "tests/foo_test.c"],
+        repo,
+    )
+
+    assert mapping["mapped"] == [{"source": "src/foo.c", "test": "tests/foo_test.c"}]
+    assert mapping["untested_source_files"] == ["src/helper.c"]
 
 
 def test_tests_reports_invalid_repo_paths(tmp_path):

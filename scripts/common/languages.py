@@ -120,8 +120,13 @@ _CSHARP = LanguageSpec(
     display_name="C#",
     extensions=(".cs",),
     config_files=(),
-    package_files=(".csproj", ".sln"),
-    test_patterns=("*Tests.cs", "*.Tests/**/*.cs"),
+    package_files=(
+        ".csproj",
+        ".sln",
+        "Directory.Build.props",
+        "Directory.Build.targets",
+    ),
+    test_patterns=("*Tests.cs", "*Test.cs", "tests/**/*.cs", "test/**/*.cs"),
     source_roots=("src",),
 )
 
@@ -130,8 +135,8 @@ _C = LanguageSpec(
     display_name="C",
     extensions=(".c", ".h"),
     config_files=(),
-    package_files=("CMakeLists.txt", "Makefile"),
-    test_patterns=("*_test.c", "tests/**/*"),
+    package_files=("CMakeLists.txt", "Makefile", "makefile", "GNUmakefile"),
+    test_patterns=("*_test.c", "*_tests.c", "test_*.c", "tests/**/*.c", "test/**/*.c"),
     source_roots=("src",),
 )
 
@@ -140,8 +145,24 @@ _CPP = LanguageSpec(
     display_name="C++",
     extensions=(".cpp", ".cc", ".cxx", ".hpp", ".hh", ".hxx"),
     config_files=(),
-    package_files=("CMakeLists.txt", "Makefile"),
-    test_patterns=("*_test.cpp", "tests/**/*"),
+    package_files=("CMakeLists.txt", "Makefile", "makefile", "GNUmakefile"),
+    test_patterns=(
+        "*_test.cpp",
+        "*_tests.cpp",
+        "test_*.cpp",
+        "*_test.cc",
+        "*_tests.cc",
+        "test_*.cc",
+        "*_test.cxx",
+        "*_tests.cxx",
+        "test_*.cxx",
+        "tests/**/*.cpp",
+        "tests/**/*.cc",
+        "tests/**/*.cxx",
+        "test/**/*.cpp",
+        "test/**/*.cc",
+        "test/**/*.cxx",
+    ),
     source_roots=("src",),
 )
 

@@ -96,6 +96,38 @@ def test_config_detects_java_and_kotlin_project_markers(tmp_path):
     assert "src/test/kotlin" in result["kotlin"]["project_markers"]
 
 
+def test_config_detects_csharp_and_c_family_project_markers(tmp_path):
+    repo = create_repo(
+        tmp_path,
+        {
+            "project.sln": "\n",
+            "src/App.cs": "public class App {}\n",
+            "src/App.csproj": "<Project />\n",
+            "Directory.Build.props": "<Project />\n",
+            "CMakeLists.txt": "project(demo)\n",
+            "Makefile": "all:\n\tcc main.c\n",
+            "toolchain.cmake": "set(CMAKE_C_STANDARD 11)\n",
+            "src/main.c": "int main(void) { return 0; }\n",
+            "src/app.cpp": "int main() { return 0; }\n",
+        },
+    )
+
+    result = detect(str(repo))
+
+    assert result["csharp"]["build_tool"] == "msbuild"
+    assert "project.sln" in result["csharp"]["project_markers"]
+    assert "App.csproj" in result["csharp"]["project_markers"]
+    assert "Directory.Build.props" in result["csharp"]["project_markers"]
+
+    assert result["c"]["build_tool"] == "cmake"
+    assert "CMakeLists.txt" in result["c"]["project_markers"]
+    assert "Makefile" in result["c"]["project_markers"]
+    assert "toolchain.cmake" in result["c"]["project_markers"]
+
+    assert result["cpp"]["build_tool"] == "cmake"
+    assert "CMakeLists.txt" in result["cpp"]["project_markers"]
+
+
 def test_config_reports_invalid_repo_paths(tmp_path):
     missing = tmp_path / "missing"
 

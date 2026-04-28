@@ -42,6 +42,15 @@ TOP_LEVEL_DEF_RE: dict[str, re.Pattern] = {
     "kotlin": re.compile(
         r"^\s*(?:public|private|protected|internal)?\s*(?:data\s+|sealed\s+|enum\s+)?(?:class|interface|object)\s+\w+|^\s*(?:public|private|protected|internal)?\s*(?:suspend\s+)?fun\s+\w+"
     ),
+    "csharp": re.compile(
+        r"^\s*(?:public|private|protected|internal)?\s*(?:abstract\s+|static\s+|sealed\s+|partial\s+)?(?:class|interface|struct|enum|record)\s+\w+"
+    ),
+    "c": re.compile(
+        r"^\s*(?:typedef\s+)?(?:struct|enum)\s+\w+|^\s*[A-Za-z_][\w\s\*]+\s+\w+\s*\([^;]*\)\s*\{"
+    ),
+    "cpp": re.compile(
+        r"^\s*(?:namespace\s+\w+|template\s*<|class\s+\w+|struct\s+\w+|enum(?:\s+class)?\s+\w+)|^\s*[A-Za-z_][\w:\s<>\*&]+\s+\w+\s*\([^;]*\)\s*\{"
+    ),
 }
 
 METHOD_DEF_RE: dict[str, re.Pattern] = {
@@ -57,6 +66,10 @@ METHOD_DEF_RE: dict[str, re.Pattern] = {
     "kotlin": re.compile(
         r"^\s*(?:public|private|protected|internal)?\s*(?:override\s+)?(?:suspend\s+)?fun\s+\w+\s*\("
     ),
+    "csharp": re.compile(
+        r"^\s*(?:public|private|protected|internal)\s+(?:static\s+|virtual\s+|override\s+|async\s+)?[\w<>\[\], ?]+\s+\w+\s*\("
+    ),
+    "cpp": re.compile(r"^\s*[A-Za-z_][\w:\s<>\*&]+\s+\w+\s*\([^;]*\)\s*\{"),
 }
 
 
