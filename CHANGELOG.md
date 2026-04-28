@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-04-28
+
+### Added
+
+- `scripts/lib/agents_document.py` — parsing and serialization for sectioned AGENTS.md documents
+- `AgentsSection` / `AgentsDocument` — frozen dataclasses representing headings, body text, and raw lines
+- `parse_agents_document()` — ATX heading-based section extraction preserving blank lines and structure
+- `build_section()` / `serialize_document()` — deterministic round-trip serialization
+- `add_or_replace_section()` / `remove_section()` / `get_section()` — mutation helpers with normalized name lookup
+- `normalize_section_name()` — case-insensitive, whitespace-normalized section name matching
+- `scripts/lib/update_merge.py` — merge helpers for incremental AGENTS.md updates
+- `MergePlan` — declarative merge plan with per-section actions (add, replace, preserve, append, prepend)
+- `plan_merge()` — diff existing document sections against new analyzer output, producing a merge plan
+- `apply_merge()` — execute a merge plan against an `AgentsDocument`, returning the updated document
+- Section-level prepend/append with feedback-sourced content
+- `scripts/lib/update_feedback.py` — repo-local feedback loading for AGENTS.md update workflows
+- `FeedbackEntry` / `FeedbackFile` — structured models for `.agentskill-feedback.json`
+- `load_feedback()` — load and validate feedback file from a repository root
+- `apply_feedback()` — merge feedback entries into a merge plan as prepend notes and pinned facts
+- `SUPPORTED_SECTION_FEEDBACK_KEYS` — supported feedback instruction types
+- `scripts/lib/update_runner.py` — internal workflow for updating AGENTS.md from current analyzer output
+- `update_agents()` — end-to-end update flow: validate repo, run analyzers, diff sections, apply feedback, serialize
+- Section filtering with `--only` flag (run specific analyzers)
+- Custom output path with `--out` flag
+- Configurable `--mode` (overwrite, merge-new, merge-all)
+- `cli.py` — `update` subcommand for updating or creating AGENTS.md
+- `PLANNER.md` — release planner system prompt for generating implementation-ready PR briefs
+
+### Changed
+
+- CLI now exposes `update` command alongside existing `analyze` and individual analyzer commands
+- README updated with update workflow documentation
+
 ## [0.6.0] - 2026-04-28
 
 ### Added
