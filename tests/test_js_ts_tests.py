@@ -1,7 +1,7 @@
 """Tests for JavaScript and TypeScript test mapping."""
 
-from commands.tests import _map_ts_tests, analyze_tests
-from test_support import create_repo, write
+from commands.tests import analyze_tests
+from test_support import create_repo
 
 
 class TestJsTsTestDetection:

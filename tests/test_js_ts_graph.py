@@ -59,18 +59,13 @@ class TestJsTsImportExtraction:
 
 class TestJsTsImportResolution:
     def test_resolve_exact_path(self, tmp_path):
-        from pathlib import Path
-
         foo_file = tmp_path / "foo.ts"
         foo_file.write_text("")
-        # file_stems contains paths relative to repo
         files = {"foo.ts"}
         result = _resolve_js_ts_import(tmp_path / "index.ts", "./foo", tmp_path, files)
         assert result == "foo.ts"
 
     def test_resolve_with_extension(self, tmp_path):
-        from pathlib import Path
-
         foo_file = tmp_path / "foo.ts"
         foo_file.write_text("")
         files = {"foo.ts"}
@@ -80,8 +75,6 @@ class TestJsTsImportResolution:
         assert result == "foo.ts"
 
     def test_resolve_index_file(self, tmp_path):
-        from pathlib import Path
-
         (tmp_path / "utils").mkdir()
         index_file = tmp_path / "utils" / "index.ts"
         index_file.write_text("")
@@ -90,7 +83,7 @@ class TestJsTsImportResolution:
         assert result == "utils/index.ts"
 
     def test_returns_none_for_external(self, tmp_path):
-        files = set()
+        files: set[str] = set()
         result = _resolve_js_ts_import(tmp_path / "index.ts", "react", tmp_path, files)
         assert result is None
 
