@@ -62,95 +62,105 @@ class TestLanguageById:
 
 
 class TestLanguageForExtension:
+    def _ext(self, extension):
+        spec = language_for_extension(extension)
+        assert spec is not None, f"No language for extension {extension!r}"
+        return spec.id
+
     def test_python(self):
-        assert language_for_extension(".py").id == "python"
+        assert self._ext(".py") == "python"
 
     def test_python_without_dot(self):
-        assert language_for_extension("py").id == "python"
+        assert self._ext("py") == "python"
 
     def test_typescript(self):
-        assert language_for_extension(".ts").id == "typescript"
+        assert self._ext(".ts") == "typescript"
 
     def test_typescript_tsx(self):
-        assert language_for_extension(".tsx").id == "typescript"
+        assert self._ext(".tsx") == "typescript"
 
     def test_javascript(self):
-        assert language_for_extension(".js").id == "javascript"
+        assert self._ext(".js") == "javascript"
 
     def test_javascript_mjs(self):
-        assert language_for_extension(".mjs").id == "javascript"
+        assert self._ext(".mjs") == "javascript"
 
     def test_javascript_cjs(self):
-        assert language_for_extension(".cjs").id == "javascript"
+        assert self._ext(".cjs") == "javascript"
 
     def test_go(self):
-        assert language_for_extension(".go").id == "go"
+        assert self._ext(".go") == "go"
 
     def test_rust(self):
-        assert language_for_extension(".rs").id == "rust"
+        assert self._ext(".rs") == "rust"
 
     def test_java(self):
-        assert language_for_extension(".java").id == "java"
+        assert self._ext(".java") == "java"
 
     def test_kotlin(self):
-        assert language_for_extension(".kt").id == "kotlin"
+        assert self._ext(".kt") == "kotlin"
 
     def test_csharp(self):
-        assert language_for_extension(".cs").id == "csharp"
+        assert self._ext(".cs") == "csharp"
 
     def test_c(self):
-        assert language_for_extension(".c").id == "c"
+        assert self._ext(".c") == "c"
 
     def test_h_is_c(self):
-        assert language_for_extension(".h").id == "c"
+        assert self._ext(".h") == "c"
 
     def test_cpp(self):
-        assert language_for_extension(".cpp").id == "cpp"
+        assert self._ext(".cpp") == "cpp"
 
     def test_cpp_cc(self):
-        assert language_for_extension(".cc").id == "cpp"
+        assert self._ext(".cc") == "cpp"
 
     def test_cpp_hpp(self):
-        assert language_for_extension(".hpp").id == "cpp"
+        assert self._ext(".hpp") == "cpp"
 
     def test_ruby(self):
-        assert language_for_extension(".rb").id == "ruby"
+        assert self._ext(".rb") == "ruby"
 
     def test_php(self):
-        assert language_for_extension(".php").id == "php"
+        assert self._ext(".php") == "php"
 
     def test_swift(self):
-        assert language_for_extension(".swift").id == "swift"
+        assert self._ext(".swift") == "swift"
 
     def test_objectivec(self):
-        assert language_for_extension(".m").id == "objectivec"
+        assert self._ext(".m") == "objectivec"
 
     def test_bash(self):
-        assert language_for_extension(".sh").id == "bash"
+        assert self._ext(".sh") == "bash"
 
     def test_bash_extension(self):
-        assert language_for_extension(".bash").id == "bash"
+        assert self._ext(".bash") == "bash"
 
     def test_unknown_returns_none(self):
         assert language_for_extension(".xyz") is None
 
     def test_case_insensitive(self):
-        assert language_for_extension(".PY").id == "python"
-        assert language_for_extension(".Go").id == "go"
+        assert self._ext(".PY") == "python"
+        assert self._ext(".Go") == "go"
 
 
 class TestLanguageForPath:
+    def _path(self, p):
+        spec = language_for_path(p)
+        assert spec is not None, f"No language for path {p!r}"
+        return spec.id
+
     def test_python_path(self):
-        assert language_for_path("src/main.py").id == "python"
+        assert self._path("src/main.py") == "python"
 
     def test_go_path(self):
-        assert language_for_path("cmd/server.go").id == "go"
+        assert self._path("cmd/server.go") == "go"
 
     def test_ruby_path(self):
-        assert language_for_path("lib/foo.rb").id == "ruby"
+        assert self._path("lib/foo.rb") == "ruby"
 
     def test_path_object(self):
-        assert language_for_path(Path("app/main.ts")).id == "typescript"
+        assert self._path(Path("app/main.ts")) == "typescript"
 
     def test_unknown_extension(self):
         assert language_for_path("readme.md") is None
@@ -206,13 +216,11 @@ class TestIsTestPath:
         assert is_test_path("test_app.py", language_id="python") is True
         assert is_test_path("test_app.py", language_id="go") is False
 
-    def test_unknown_language_id_ignores_filter(self):
+    def test_unknown_language_id_returns_false(self):
         assert is_test_path("test_app.py", language_id="cobol") is False
 
 
 class TestScanRegression:
-    """Ensure scan output shape stays stable after registry migration."""
-
     def test_scan_detects_languages_from_registry(self, tmp_path):
         repo = create_repo(
             tmp_path,

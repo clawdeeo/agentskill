@@ -279,6 +279,8 @@ def is_test_path(path: str | Path, language_id: str | None = None) -> bool:
     name = p.name
     rel = str(p)
 
+    specs: tuple[LanguageSpec, ...]
+
     if language_id is not None:
         if language_id in _BY_ID:
             specs = (_BY_ID[language_id],)
