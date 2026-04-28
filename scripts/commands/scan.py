@@ -16,6 +16,7 @@ import sys
 from pathlib import Path
 
 from common.fs import count_lines, validate_repo
+from common.languages import language_for_path
 from common.walk import walk_repo
 from lib.output import run_and_output
 
@@ -50,29 +51,6 @@ SKIP_EXTENSIONS: set[str] = {
     ".bz2",
     ".xz",
     ".lock",
-}
-
-EXTENSIONS: dict[str, str] = {
-    ".py": "python",
-    ".ts": "typescript",
-    ".tsx": "typescript",
-    ".js": "javascript",
-    ".jsx": "javascript",
-    ".mjs": "javascript",
-    ".go": "go",
-    ".rs": "rust",
-    ".rb": "ruby",
-    ".java": "java",
-    ".kt": "kotlin",
-    ".swift": "swift",
-    ".cpp": "cpp",
-    ".cc": "cpp",
-    ".cxx": "cpp",
-    ".c": "c",
-    ".h": "c",
-    ".cs": "csharp",
-    ".sh": "bash",
-    ".bash": "bash",
 }
 
 ENTRY_POINT_NAMES: set[str] = {
@@ -110,7 +88,8 @@ def scan(repo_path: str, lang_filter: str | None = None) -> dict:
         if ext in SKIP_EXTENSIONS:
             continue
 
-        language = EXTENSIONS.get(ext)
+        spec = language_for_path(filepath)
+        language = spec.id if spec else None
 
         if not language:
             continue

@@ -19,31 +19,12 @@ from pathlib import Path
 
 from common.constants import should_skip_dir
 from common.fs import read_text, validate_repo
+from common.languages import language_for_extension
 from lib.output import run_and_output
 
 MAX_SMALL_INDENT = 8
 MIN_FILES_FOR_LINE_LENGTH = 5
 MAX_FILES_REPORTED = 10
-
-EXTENSIONS: dict[str, str] = {
-    ".py": "python",
-    ".ts": "typescript",
-    ".tsx": "typescript",
-    ".js": "javascript",
-    ".jsx": "javascript",
-    ".mjs": "javascript",
-    ".go": "go",
-    ".rs": "rust",
-    ".rb": "ruby",
-    ".java": "java",
-    ".kt": "kotlin",
-    ".swift": "swift",
-    ".cpp": "cpp",
-    ".cc": "cpp",
-    ".cxx": "cpp",
-    ".c": "c",
-    ".cs": "csharp",
-}
 
 TOP_LEVEL_DEF_RE: dict[str, re.Pattern] = {
     "typescript": re.compile(
@@ -78,7 +59,8 @@ def _collect_files(repo: Path, lang_filter: str | None) -> dict[str, list[Path]]
 
         for fn in files:
             ext = Path(fn).suffix.lower()
-            lang = EXTENSIONS.get(ext)
+            spec = language_for_extension(ext)
+            lang = spec.id if spec else None
 
             if not lang:
                 continue
