@@ -237,20 +237,14 @@ _BY_ID, _BY_EXT = _build_registry()
 
 
 def all_language_specs() -> tuple[LanguageSpec, ...]:
-    """Return all registered language specs in deterministic order."""
     return _LANGUAGES
 
 
 def language_by_id(language_id: str) -> LanguageSpec | None:
-    """Look up a language spec by its stable ID."""
     return _BY_ID.get(language_id)
 
 
 def language_for_extension(extension: str) -> LanguageSpec | None:
-    """Look up a language spec by file extension.
-
-    Accepts forms with or without a leading dot (e.g. '.py' or 'py').
-    """
     normalized = extension.lower()
 
     if not normalized.startswith("."):
@@ -260,21 +254,14 @@ def language_for_extension(extension: str) -> LanguageSpec | None:
 
 
 def language_for_path(path: str | Path) -> LanguageSpec | None:
-    """Look up a language spec by a file path's suffix."""
     return language_for_extension(Path(path).suffix)
 
 
 def is_supported_language(language_id: str) -> bool:
-    """Return True if the given language ID is registered."""
     return language_id in _BY_ID
 
 
 def is_test_path(path: str | Path, language_id: str | None = None) -> bool:
-    """Return True if the path matches a known test pattern.
-
-    When language_id is provided, only that language's patterns are checked.
-    Otherwise, all registered patterns are tested.
-    """
     p = Path(path)
     name = p.name
     rel = str(p)
