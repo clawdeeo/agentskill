@@ -114,7 +114,7 @@ def _collect_python_files(repo: Path) -> tuple[list[Path], list[Path]]:
 def _collect_ts_files(repo: Path) -> tuple[list[Path], list[Path]]:
     test_files: list[Path] = []
     source_files: list[Path] = []
-    exts = {".ts", ".tsx", ".js", ".jsx", ".mjs"}
+    exts = {".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"}
 
     for dirpath, dirs, files in os.walk(repo):
         dirs[:] = [d for d in dirs if not should_skip_dir(d)]
@@ -207,6 +207,57 @@ def _extract_run_command(repo: Path, framework: str) -> str:
             return m.group(1).strip()
 
     return FRAMEWORK_RUN_DEFAULTS.get(framework, framework)
+
+
+def _map_ts_tests(source_files: list[Path], test_files: list[Path], repo: Path) -> dict:
+    """Map TypeScript/JavaScript test files to their likely source files."""
+    mapped: list[dict] = []
+    untested: list[str] = []
+    unmatched_tests: list[str] = []
+
+    # Build lookup by stem (without extension)
+    source_by_stem: dict[str, Path] = {}
+    for sf in source_files:
+        stem = sf.stem.lower()
+        source_by_stem[stem] = sf
+        # Also handle index files
+        if stem == "index":
+            source_by_stem[sf.parent.name.lower()] = sf
+
+    matched_tests: set[str] = set()
+
+    for tf in test_files:
+        # Extract the source name from test file patterns:
+        # foo.test.ts -> foo
+        # foo.spec.ts -> foo
+        # foo-test.ts -> foo
+        stem = tf.stem.lower()
+        candidate = re.sub(r"[.-](test|spec)$", "", stem)
+        candidate = re.sub(r"^(test|spec)[.-]", "", candidate)
+
+        match = source_by_stem.get(candidate)
+
+        if match:
+            matched_tests.add(str(match.relative_to(repo)))
+            mapped.append(
+                {
+                    "source": str(match.relative_to(repo)),
+                    "test": str(tf.relative_to(repo)),
+                }
+            )
+        else:
+            unmatched_tests.append(str(tf.relative_to(repo)))
+
+    for sf in source_files:
+        rel = str(sf.relative_to(repo))
+        if rel not in matched_tests:
+            untested.append(rel)
+
+    return {
+        "mapped": mapped,
+        "untested_source_files": untested,
+        "test_files_without_source_match": unmatched_tests,
+    }
 
 
 def _map_python_tests(
@@ -413,6 +464,7 @@ def _analyze_typescript(repo: Path) -> dict | None:
 
     framework, run_cmd = _detect_ts_framework(repo)
     run_cmd = _extract_run_command(repo, framework) or run_cmd
+    coverage = _map_ts_tests(source_files, test_files, repo)
     structure = _detect_test_structure(repo, test_files)
     naming = _detect_naming_patterns(test_files)
     rep_test = _pick_representative(test_files)
@@ -422,6 +474,7 @@ def _analyze_typescript(repo: Path) -> dict | None:
         "run_command": run_cmd,
         "test_files": len(test_files),
         "source_files": len(source_files),
+        "coverage_shape": coverage,
         "structure": structure,
         "naming": naming,
         "representative_test": str(Path(rep_test).relative_to(repo))
