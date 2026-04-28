@@ -1,0 +1,2 @@
+@interface UserService : NSObject
+@end

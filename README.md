@@ -139,6 +139,23 @@ scripts/
 references/
   GOTCHAS.md        # extraction and synthesis errors to avoid
 examples/
+  README.md             # language fixture index for analyzer validation
+  python/               # compact per-language analyzer fixtures
+  javascript/
+  typescript/
+  go/
+  rust/
+  java/
+  kotlin/
+  csharp/
+  c/
+  cpp/
+  ruby/
+  php/
+  swift/
+  objectivec/
+  bash/
+  mixed/
   SINGLE_LANGUAGE.md   # reference output: single-language repo
   MULTI_LANGUAGE.md    # reference output: multi-language single repo
   MONOREPO.md          # reference output: monorepo with multiple services
@@ -162,13 +179,12 @@ The public commands stay the same after refactors. Internal code is organized by
 
 ## Examples
 
-The `examples/` directory contains three reference `AGENTS.md` files, each representing a distinct repo shape:
+The `examples/` directory now serves two roles:
 
-- **`SINGLE_LANGUAGE.md`** — a Go HTTP service with no external tooling
-- **`MULTI_LANGUAGE.md`** — a Python/TypeScript project with shared conventions
-- **`MONOREPO.md`** — a multi-service monorepo with per-service sections
+- Compact static language fixtures under per-language subdirectories for analyzer validation.
+- Reference `AGENTS.md` examples in `SINGLE_LANGUAGE.md`, `MULTI_LANGUAGE.md`, and `MONOREPO.md`.
 
-Consult the relevant example before handling an unfamiliar repo shape.
+See [`examples/README.md`](./examples/README.md) for the supported fixture set.
 
 ---
 

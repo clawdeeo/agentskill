@@ -4,6 +4,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = ROOT / "scripts"
+EXAMPLES_DIR = ROOT / "examples"
 
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
