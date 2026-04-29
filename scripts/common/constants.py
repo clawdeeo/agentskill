@@ -1,7 +1,11 @@
-"""Shared constants for repository walking."""
+"""Shared constants for repository walking and test discovery."""
 
 MAX_FILES_TO_PARSE = 10_000
 MAX_FILE_BYTES = 1_000_000
+
+MAKEFILE_NAMES = ("Makefile", "makefile", "GNUmakefile")
+TOP_LEVEL_TEST_DIRS = {"tests", "test", "__tests__", "spec"}
+TEST_STRUCTURE_SOURCE_ROOTS = ("src", "lib", "pkg")
 
 SKIP_DIRS: set[str] = {
     "node_modules",

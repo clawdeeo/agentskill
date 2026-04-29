@@ -16,16 +16,24 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from common.constants import should_skip_dir
+from common.constants import (
+    MAKEFILE_NAMES,
+    TEST_STRUCTURE_SOURCE_ROOTS,
+    TOP_LEVEL_TEST_DIRS,
+    should_skip_dir,
+)
 from common.fs import count_lines, read_text, validate_repo
-from common.languages import is_test_path, language_for_path
+from common.languages import (
+    is_test_path,
+    language_by_id,
+    language_for_extension,
+    language_for_path,
+)
 from lib.cli_entrypoint import run_command_main
 
 FRAMEWORK_DETECTION_SAMPLE = 5
 NAMING_DETECTION_SAMPLE = 10
 MAX_FIXTURE_NAMES = 20
-
-MAKEFILE_NAMES = ["Makefile", "makefile", "GNUmakefile"]
 
 FRAMEWORK_RUN_DEFAULTS = {
     "pytest": "pytest",
@@ -42,9 +50,26 @@ FRAMEWORK_RUN_DEFAULTS = {
     "cmocka": "ctest",
 }
 
-TOP_LEVEL_TEST_DIRS = {"tests", "test", "__tests__", "spec"}
 
-SOURCE_ROOT_CANDIDATES = ["src", "lib", "pkg"]
+def _required_extensions(language_id: str) -> tuple[str, ...]:
+    spec = language_by_id(language_id)
+
+    if spec is None:
+        raise ValueError(f"missing language spec: {language_id}")
+
+    return spec.extensions
+
+
+TS_JS_LANGUAGE_IDS = {"typescript", "javascript"}
+
+C_FAMILY_SOURCE_EXTENSIONS = {
+    "c": frozenset(ext for ext in _required_extensions("c") if ext != ".h"),
+    "cpp": frozenset(
+        ext for ext in _required_extensions("cpp") if ext not in {".hpp", ".hh", ".hxx"}
+    ),
+}
+
+OBJECTIVEC_SOURCE_EXTENSIONS = frozenset(_required_extensions("objectivec"))
 
 JVM_TEST_FRAMEWORKS = {
     "org.junit.Test": "junit",
@@ -110,6 +135,16 @@ def _count_lines(path: Path) -> int:
     return count_lines(path)
 
 
+def _has_language_suffix(filename: str, language_id: str) -> bool:
+    spec = language_for_extension(Path(filename).suffix.lower())
+    return spec is not None and spec.id == language_id
+
+
+def _has_any_language_suffix(filename: str, language_ids: set[str]) -> bool:
+    spec = language_for_extension(Path(filename).suffix.lower())
+    return spec is not None and spec.id in language_ids
+
+
 def _is_fixture_decorator(decorator: ast.expr) -> bool:
     """Return True if an AST decorator node is a pytest fixture."""
     dec_str = ast.unparse(decorator) if hasattr(ast, "unparse") else ""
@@ -152,7 +187,7 @@ def _collect_python_files(repo: Path) -> tuple[list[Path], list[Path]]:
         dirs[:] = [d for d in dirs if not should_skip_dir(d)]
 
         for fn in files:
-            if not fn.endswith(".py"):
+            if not _has_language_suffix(fn, "python"):
                 continue
 
             fpath = Path(dirpath) / fn
@@ -174,13 +209,12 @@ def _collect_python_files(repo: Path) -> tuple[list[Path], list[Path]]:
 def _collect_ts_files(repo: Path) -> tuple[list[Path], list[Path]]:
     test_files: list[Path] = []
     source_files: list[Path] = []
-    exts = {".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"}
 
     for dirpath, dirs, files in os.walk(repo):
         dirs[:] = [d for d in dirs if not should_skip_dir(d)]
 
         for fn in files:
-            if Path(fn).suffix.lower() not in exts:
+            if not _has_any_language_suffix(fn, TS_JS_LANGUAGE_IDS):
                 continue
 
             fpath = Path(dirpath) / fn
@@ -369,7 +403,11 @@ def _detect_test_structure(repo: Path, test_files: list[Path]) -> dict:
     ]
 
     test_dir = most_common_dir + "/"
-    src_root = next((c for c in SOURCE_ROOT_CANDIDATES if (repo / c).exists()), None)
+
+    src_root = next(
+        (c for c in TEST_STRUCTURE_SOURCE_ROOTS if (repo / c).exists()),
+        None,
+    )
 
     mirrors = (
         _mirrors_source_tree(test_dirs, most_common_dir, repo, src_root)
@@ -545,7 +583,7 @@ def _collect_go_files(repo: Path) -> tuple[list[Path], list[Path]]:
         dirs[:] = [d for d in dirs if not should_skip_dir(d)]
 
         for fn in files:
-            if not fn.endswith(".go"):
+            if not _has_language_suffix(fn, "go"):
                 continue
 
             fpath = Path(dirpath) / fn
@@ -566,7 +604,7 @@ def _collect_rust_files(repo: Path) -> tuple[list[Path], list[Path]]:
         dirs[:] = [d for d in dirs if not should_skip_dir(d)]
 
         for fn in files:
-            if not fn.endswith(".rs"):
+            if not _has_language_suffix(fn, "rust"):
                 continue
 
             fpath = Path(dirpath) / fn
@@ -616,7 +654,7 @@ def _collect_csharp_files(repo: Path) -> tuple[list[Path], list[Path]]:
         dirs[:] = [d for d in dirs if not should_skip_dir(d)]
 
         for fn in files:
-            if not fn.endswith(".cs"):
+            if not _has_language_suffix(fn, "csharp"):
                 continue
 
             fpath = Path(dirpath) / fn
@@ -641,11 +679,6 @@ def _collect_c_family_files(
 ) -> tuple[list[Path], list[Path]]:
     test_files: list[Path] = []
     source_files: list[Path] = []
-    source_exts = {
-        "c": {".c"},
-        "cpp": {".cpp", ".cc", ".cxx"},
-    }
-
     for dirpath, dirs, files in os.walk(repo):
         dirs[:] = [d for d in dirs if not should_skip_dir(d)]
 
@@ -656,7 +689,7 @@ def _collect_c_family_files(
             if not spec or spec.id != language_id:
                 continue
 
-            if fpath.suffix.lower() not in source_exts[language_id]:
+            if fpath.suffix.lower() not in C_FAMILY_SOURCE_EXTENSIONS[language_id]:
                 continue
 
             rel = str(fpath.relative_to(repo))
@@ -682,7 +715,7 @@ def _collect_ruby_files(repo: Path) -> tuple[list[Path], list[Path]]:
         dirs[:] = [d for d in dirs if not should_skip_dir(d)]
 
         for fn in files:
-            if not fn.endswith(".rb"):
+            if not _has_language_suffix(fn, "ruby"):
                 continue
 
             fpath = Path(dirpath) / fn
@@ -708,7 +741,7 @@ def _collect_php_files(repo: Path) -> tuple[list[Path], list[Path]]:
         dirs[:] = [d for d in dirs if not should_skip_dir(d)]
 
         for fn in files:
-            if not fn.endswith(".php"):
+            if not _has_language_suffix(fn, "php"):
                 continue
 
             fpath = Path(dirpath) / fn
@@ -775,7 +808,7 @@ def _collect_swift_files(repo: Path) -> tuple[list[Path], list[Path]]:
         dirs[:] = [d for d in dirs if not should_skip_dir(d)]
 
         for fn in files:
-            if not fn.endswith(".swift"):
+            if not _has_language_suffix(fn, "swift"):
                 continue
 
             fpath = Path(dirpath) / fn
@@ -800,7 +833,7 @@ def _collect_objectivec_files(repo: Path) -> tuple[list[Path], list[Path]]:
             fpath = Path(dirpath) / fn
             suffix = fpath.suffix.lower()
 
-            if suffix not in {".m", ".mm"} and not (
+            if suffix not in OBJECTIVEC_SOURCE_EXTENSIONS and not (
                 suffix == ".h" and _is_objectivec_header(fpath)
             ):
                 continue
