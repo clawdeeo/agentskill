@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-04-29
+
+### Added
+
+- `scripts/lib/cli_entrypoint.py` — shared CLI entrypoint helper for command modules
+- `tests/test_cli_entrypoint.py` — tests for CLI entrypoint argument parsing and dispatch
+- `tests/test_error_contracts.py` — error contract tests across command modules
+- `tests/test_config.py` — expanded config detection tests with multi-language fixtures
+- `tests/test_graph.py` — expanded import resolution and dependency graph tests
+- `tests/test_measure.py` — measurement tests for indentation, line length, and blank lines
+- `tests/test_scan.py` — expanded scan tests including symlink and skip-directory handling
+- `tests/test_symbols.py` — expanded symbol extraction tests for Python, JS/TS, Go, Rust
+
+### Changed
+
+- Command modules (`config`, `git`, `graph`, `measure`, `scan`, `symbols`, `tests`) now use shared CLI entrypoint helper
+- `scan` and `walk` skip symlinked files and directories
+- `constants.py` and `walk.py` updated for improved test discovery
+- Import resolution and symbol extraction improved with better edge cases
+
+### Added (docs)
+
+- `ROADMAP.md` — 0.10.0 milestone for CLI and skill split
+
 ## [0.7.0] - 2026-04-28
 
 ### Added
