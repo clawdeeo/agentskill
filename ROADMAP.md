@@ -117,6 +117,21 @@ This roadmap maps the path from the current release to a stable 1.0.0. Each vers
 
 ---
 
+## 0.10.0 — Package Layout & Skill / CLI Split
+
+**Theme:** separate skill-facing scripts from the packaged Python CLI with a more idiomatic project layout.
+
+- Move the packaged Python CLI into a dedicated `cli/` or `agentskill/` package directory, with the console entry point importing from that package instead of the repo root
+- Keep a small top-level `scripts/` layer focused on skill and operator workflows rather than housing the primary Python package
+- Split LLM skill support files from the actual end-user CLI implementation so packaging, imports, and tests no longer depend on the current mixed layout
+- Decide and document which helper scripts should remain in `scripts/` for local/dev/skill usage and which should become package modules
+- Prefer shell/Bash wrappers in `scripts/` where they improve operator and LLM usability, while keeping Python business logic inside the packaged module
+- Update `pyproject.toml` entry points, package discovery, and tests to match the new layout
+- Preserve the public `agentskill` CLI contract while refactoring internal module paths
+- Document the new repository structure and developer workflow for both packaged CLI usage and skill-facing script usage
+
+---
+
 ## 1.0.0 — Stable Release
 
 **Theme:** a reliable, documented, multi-language tool ready for daily use.
