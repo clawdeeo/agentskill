@@ -4,6 +4,7 @@ from pathlib import Path
 
 from lib.logging_utils import LOGGER_NAME, configure_logging, get_logger
 from lib.output import run_and_output, validate_out_path, write_output
+from lib.output_schema import OutputSchemaError
 
 
 def test_write_output_prints_and_writes_file(tmp_path, capsys, monkeypatch):
@@ -147,3 +148,19 @@ def test_run_and_output_logs_exceptions_to_stderr_without_polluting_stdout(capsy
     assert json.loads(captured.out) == {"error": "kaboom", "script": "demo"}
     assert "ERROR agentskill: Command demo failed for repo sample" in captured.err
     assert "Traceback" in captured.err
+
+
+def test_run_and_output_raises_on_invalid_output_shape():
+    def bad(repo: str):
+        return {"error": "kaboom"}
+
+    try:
+        run_and_output(
+            bad,
+            repo="sample",
+            pretty=False,
+            script_name="demo",
+        )
+        raise AssertionError("invalid output shape should raise OutputSchemaError")
+    except OutputSchemaError as exc:
+        assert "exactly 'error' and 'script'" in str(exc)

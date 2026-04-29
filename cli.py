@@ -32,7 +32,14 @@ from lib.update_runner import update_agents
 
 def cmd_analyze(args: argparse.Namespace) -> int:
     result = run_many(args.repos, getattr(args, "lang", None))
-    write_output(result, args.pretty, getattr(args, "out", None))
+
+    write_output(
+        result,
+        args.pretty,
+        getattr(args, "out", None),
+        schema_mode="analyze",
+    )
+
     return 0
 
 

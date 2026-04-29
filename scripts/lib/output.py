@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from lib.logging_utils import configure_logging
+from lib.output_schema import validate_public_output
 
 
 def validate_out_path(out: str) -> Path:
@@ -25,8 +26,17 @@ def validate_out_path(out: str) -> Path:
     return resolved
 
 
-def write_output(data: dict, pretty: bool = False, out: str | None = None) -> None:
+def write_output(
+    data: dict,
+    pretty: bool = False,
+    out: str | None = None,
+    schema_mode: str | None = None,
+) -> None:
     configure_logging()
+
+    if schema_mode:
+        validate_public_output(data, mode=schema_mode)
+
     indent = 2 if pretty else None
     text = json.dumps(data, indent=indent)
 
@@ -57,6 +67,6 @@ def run_and_output(
         logger.exception("Command %s failed for repo %s", script_name, repo)
         result = {"error": str(exc), "script": script_name}
 
-    write_output(result, pretty=pretty, out=out)
+    write_output(result, pretty=pretty, out=out, schema_mode="single")
 
     return 1 if "error" in result else 0

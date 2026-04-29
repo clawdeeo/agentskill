@@ -64,7 +64,7 @@ def test_runner_captures_command_exceptions(monkeypatch, caplog):
     finally:
         logger.propagate = original_propagate
 
-    assert result["scan"] == {"error": "boom"}
+    assert result["scan"] == {"error": "boom", "script": "scan"}
     assert "Analyzer scan failed for repo repo" in caplog.text
     assert "Traceback" in caplog.text
     monkeypatch.setitem(runner.COMMANDS["scan"], "fn", original)
@@ -91,7 +91,8 @@ def test_runner_times_out_slow_commands(monkeypatch, caplog):
         logger.propagate = original_propagate
 
     assert result["scan"] == {
-        "error": (f"analyzer timed out after {runner.ANALYZER_TIMEOUT_SECONDS}s")
+        "error": (f"analyzer timed out after {runner.ANALYZER_TIMEOUT_SECONDS}s"),
+        "script": "scan",
     }
 
     assert "Analyzer scan timed out after 0.05s for repo repo" in caplog.text
@@ -151,10 +152,11 @@ def test_runner_handles_mixed_success_exception_and_timeout(monkeypatch, caplog)
         logger.propagate = original_propagate
 
     assert result["scan"] == {"ok": "scan"}
-    assert result["measure"] == {"error": "boom"}
+    assert result["measure"] == {"error": "boom", "script": "measure"}
 
     assert result["config"] == {
-        "error": (f"analyzer timed out after {runner.ANALYZER_TIMEOUT_SECONDS}s")
+        "error": (f"analyzer timed out after {runner.ANALYZER_TIMEOUT_SECONDS}s"),
+        "script": "config",
     }
 
     assert set(result) == set(runner.COMMANDS)

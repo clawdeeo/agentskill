@@ -85,7 +85,7 @@ def run_all(repo: str, lang_filter: str | None = None) -> dict:
                     result[name] = future.result()
                 except Exception as exc:
                     logger.exception("Analyzer %s failed for repo %s", name, repo)
-                    result[name] = {"error": str(exc)}
+                    result[name] = {"error": str(exc), "script": name}
 
                 pending.remove(future)
 
@@ -107,7 +107,8 @@ def run_all(repo: str, lang_filter: str | None = None) -> dict:
                 )
 
                 result[name] = {
-                    "error": (f"analyzer timed out after {ANALYZER_TIMEOUT_SECONDS}s")
+                    "error": (f"analyzer timed out after {ANALYZER_TIMEOUT_SECONDS}s"),
+                    "script": name,
                 }
 
                 future.cancel()
