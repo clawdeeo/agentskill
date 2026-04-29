@@ -100,6 +100,10 @@ python cli.py tests <repo> --pretty
 # Write output to file
 python cli.py analyze <repo> --out report.json
 
+# Generate AGENTS.md markdown directly
+python cli.py generate <repo>
+python cli.py generate <repo> --out AGENTS.md
+
 # Update or create AGENTS.md in place
 python cli.py update <repo>
 python cli.py update <repo> --section testing
@@ -119,6 +123,14 @@ merges them with any existing `AGENTS.md`, and writes the result back to
 more named sections, `--exclude-section` to keep specific generated sections
 untouched, and `--force` for a clean-slate rebuild that drops old custom
 sections instead of preserving them.
+
+### Generate Workflow
+
+`python cli.py generate <repo>` analyzes the repository and prints a fresh
+generated `AGENTS.md` document to stdout. Use `--out` to write that markdown to
+an explicit file path. Unlike `update`, `generate` does not merge with an
+existing `AGENTS.md` and does not write back to `<repo>/AGENTS.md` unless you
+explicitly choose an output path.
 
 ### Repo-Local Feedback
 

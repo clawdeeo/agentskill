@@ -24,6 +24,7 @@ from pathlib import Path
 _HERE = Path(__file__).parent
 sys.path.insert(0, str(_HERE / "scripts"))
 
+from lib.generate_runner import generate_agents
 from lib.logging_utils import configure_logging
 from lib.output import run_and_output, write_output
 from lib.runner import COMMANDS, run_many
@@ -70,6 +71,17 @@ def cmd_update(args: argparse.Namespace) -> int:
         include_sections=getattr(args, "section", None),
         exclude_sections=getattr(args, "exclude_section", None),
         force=args.force,
+        out=getattr(args, "out", None),
+    )
+
+
+def cmd_generate(args: argparse.Namespace) -> int:
+    if getattr(args, "pretty", False):
+        print("generate does not support --pretty", file=sys.stderr)
+        return 1
+
+    return generate_agents(
+        args.repo,
         out=getattr(args, "out", None),
     )
 
@@ -157,6 +169,13 @@ def main(argv: list[str] | None = None) -> int:
 
     p_update.add_argument("--out", metavar="FILE", help="Write markdown to file")
 
+    p_generate = sub.add_parser(
+        "generate", help="Generate AGENTS.md markdown from repository analysis"
+    )
+
+    p_generate.add_argument("repo", help="Path to repository")
+    p_generate.add_argument("--out", metavar="FILE", help="Write markdown to file")
+
     for p in [
         p_scan,
         p_measure,
@@ -182,6 +201,7 @@ def main(argv: list[str] | None = None) -> int:
         "symbols": lambda a: _single_script_cmd("symbols", a),
         "tests": lambda a: _single_script_cmd("tests", a),
         "update": cmd_update,
+        "generate": cmd_generate,
     }
 
     handler = dispatch.get(args.command)
