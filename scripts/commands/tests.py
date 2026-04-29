@@ -19,7 +19,7 @@ from pathlib import Path
 from common.constants import should_skip_dir
 from common.fs import count_lines, read_text, validate_repo
 from common.languages import is_test_path, language_for_path
-from lib.output import run_and_output
+from lib.cli_entrypoint import run_command_main
 
 FRAMEWORK_DETECTION_SAMPLE = 5
 NAMING_DETECTION_SAMPLE = 10
@@ -1618,21 +1618,10 @@ def analyze_tests(repo_path: str) -> dict:
 
 
 def main(argv: list[str] | None = None) -> int:
-    import argparse
-
-    parser = argparse.ArgumentParser(
+    return run_command_main(
+        argv=argv,
         description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-
-    parser.add_argument("repo", help="Path to repository")
-    parser.add_argument("--pretty", action="store_true", help="Pretty-print output")
-    args = parser.parse_args(argv)
-
-    return run_and_output(
-        analyze_tests,
-        repo=args.repo,
-        pretty=args.pretty,
+        command_fn=analyze_tests,
         script_name="tests",
     )
 

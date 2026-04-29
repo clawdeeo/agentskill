@@ -20,7 +20,7 @@ from pathlib import Path
 from common.constants import should_skip_dir
 from common.fs import read_text, validate_repo
 from common.languages import language_for_path
-from lib.output import run_and_output
+from lib.cli_entrypoint import run_command_main
 
 MIN_NAME_LENGTH = 4
 MAX_AFFIX_LENGTH = 8
@@ -1308,25 +1308,12 @@ def extract_symbols(repo_path: str, lang_filter: str | None = None) -> dict:
 
 
 def main(argv: list[str] | None = None) -> int:
-    import argparse
-
-    parser = argparse.ArgumentParser(
+    return run_command_main(
+        argv=argv,
         description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-
-    parser.add_argument("repo", help="Path to repository")
-    parser.add_argument("--lang", help="Filter to a single language")
-    parser.add_argument("--pretty", action="store_true", help="Pretty-print output")
-
-    args = parser.parse_args(argv)
-
-    return run_and_output(
-        extract_symbols,
-        repo=args.repo,
-        pretty=args.pretty,
+        command_fn=extract_symbols,
         script_name="symbols",
-        extra_kwargs={"lang_filter": args.lang},
+        supports_lang=True,
     )
 
 

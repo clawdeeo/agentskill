@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from common.fs import validate_repo
-from lib.output import run_and_output
+from lib.cli_entrypoint import run_command_main
 from lib.parsers import load_toml_safe, load_yaml_safe
 
 MAX_CONFIG_READ_BYTES = 32_000
@@ -715,21 +715,10 @@ def detect(repo_path: str) -> dict:
 
 
 def main(argv: list[str] | None = None) -> int:
-    import argparse
-
-    parser = argparse.ArgumentParser(
+    return run_command_main(
+        argv=argv,
         description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-
-    parser.add_argument("repo", help="Path to repository")
-    parser.add_argument("--pretty", action="store_true", help="Pretty-print output")
-    args = parser.parse_args(argv)
-
-    return run_and_output(
-        detect,
-        repo=args.repo,
-        pretty=args.pretty,
+        command_fn=detect,
         script_name="config",
     )
 

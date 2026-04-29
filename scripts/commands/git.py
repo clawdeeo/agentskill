@@ -13,8 +13,8 @@ import subprocess
 import sys
 
 from common.fs import validate_repo
+from lib.cli_entrypoint import run_command_main
 from lib.logging_utils import get_logger
-from lib.output import run_and_output
 
 GIT_TIMEOUT = 30
 GIT_HASH_LENGTH = 40
@@ -309,22 +309,10 @@ def analyze(repo_path: str) -> dict:
 
 
 def main(argv: list[str] | None = None) -> int:
-    import argparse
-
-    parser = argparse.ArgumentParser(
+    return run_command_main(
+        argv=argv,
         description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-
-    parser.add_argument("repo", help="Path to repository")
-    parser.add_argument("--pretty", action="store_true", help="Pretty-print output")
-
-    args = parser.parse_args(argv)
-
-    return run_and_output(
-        analyze,
-        repo=args.repo,
-        pretty=args.pretty,
+        command_fn=analyze,
         script_name="git",
     )
 
