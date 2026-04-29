@@ -1,0 +1,48 @@
+{
+  "python": {
+    "classes": {
+      "codebase_specific": [],
+      "patterns": {},
+      "total": "number"
+    },
+    "constants": {
+      "codebase_specific": [],
+      "patterns": {
+        "SCREAMING_SNAKE_CASE": {
+          "count": "number",
+          "pct": "number"
+        }
+      },
+      "total": "number"
+    },
+    "files": {
+      "codebase_specific": [],
+      "patterns": {
+        "other": {
+          "count": "number",
+          "pct": "number"
+        },
+        "snake_case": {
+          "count": "number",
+          "pct": "number"
+        }
+      },
+      "total": "number"
+    },
+    "functions": {
+      "codebase_specific": [],
+      "patterns": {
+        "snake_case": {
+          "count": "number",
+          "pct": "number"
+        }
+      },
+      "total": "number"
+    },
+    "private_members": {
+      "double_underscore": "number",
+      "examples": [],
+      "single_underscore": "number"
+    }
+  }
+}

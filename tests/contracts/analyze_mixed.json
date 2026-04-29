@@ -1,0 +1,317 @@
+{
+  "config": {
+    "go": {
+      "formatter": {
+        "config_file": "null",
+        "name": "str",
+        "settings": {}
+      }
+    },
+    "typescript": {
+      "type_checker": {
+        "config_file": "str",
+        "name": "str",
+        "settings": {
+          "strict": "bool"
+        }
+      }
+    }
+  },
+  "git": {
+    "error": "str",
+    "script": "str"
+  },
+  "graph": {
+    "bash": {
+      "boundary_violations": [],
+      "circular_dependencies": [],
+      "edges": [],
+      "modules": [
+        "str"
+      ],
+      "most_depended_on": [],
+      "parse_errors": []
+    },
+    "go": {
+      "boundary_violations": [],
+      "circular_dependencies": [],
+      "edges": [],
+      "modules": [
+        "str"
+      ],
+      "most_depended_on": [],
+      "parse_errors": []
+    },
+    "monorepo_boundaries": {
+      "cross_service_imports": [],
+      "detected": "bool",
+      "services": []
+    },
+    "typescript": {
+      "boundary_violations": [],
+      "circular_dependencies": [],
+      "edges": [],
+      "modules": [
+        "str"
+      ],
+      "most_depended_on": [],
+      "parse_errors": []
+    }
+  },
+  "measure": {
+    "bash": {
+      "blank_lines": {},
+      "indentation": {
+        "mixed_files": [],
+        "size": "number",
+        "tab_files": [],
+        "unit": "str"
+      },
+      "line_length": {},
+      "trailing_newline": {
+        "absent": "number",
+        "present": "number"
+      },
+      "trailing_whitespace": {
+        "files_with_trailing_ws": "number"
+      }
+    },
+    "go": {
+      "blank_lines": {
+        "between_top_level_defs": {
+          "distribution": {
+            "1": "number"
+          },
+          "mode": "number"
+        }
+      },
+      "indentation": {
+        "mixed_files": [],
+        "size": "number",
+        "tab_files": [],
+        "unit": "str"
+      },
+      "line_length": {},
+      "trailing_newline": {
+        "absent": "number",
+        "present": "number"
+      },
+      "trailing_whitespace": {
+        "files_with_trailing_ws": "number"
+      }
+    },
+    "typescript": {
+      "blank_lines": {},
+      "indentation": {
+        "mixed_files": [],
+        "size": "number",
+        "tab_files": [],
+        "unit": "str"
+      },
+      "line_length": {},
+      "trailing_newline": {
+        "absent": "number",
+        "present": "number"
+      },
+      "trailing_whitespace": {
+        "files_with_trailing_ws": "number"
+      }
+    }
+  },
+  "scan": {
+    "read_order": [
+      "str"
+    ],
+    "summary": {
+      "avg_depth": "number",
+      "by_language": {
+        "bash": {
+          "file_count": "number",
+          "total_lines": "number"
+        },
+        "go": {
+          "file_count": "number",
+          "total_lines": "number"
+        },
+        "typescript": {
+          "file_count": "number",
+          "total_lines": "number"
+        }
+      },
+      "max_depth": "number",
+      "total_files": "number"
+    },
+    "tree": [
+      {
+        "depth": "number",
+        "language": "str",
+        "line_count": "number",
+        "path": "str",
+        "size_bytes": "number",
+        "type": "str"
+      }
+    ]
+  },
+  "symbols": {
+    "bash": {
+      "files": {
+        "codebase_specific": [],
+        "patterns": {
+          "other": {
+            "count": "number",
+            "pct": "number"
+          }
+        },
+        "total": "number"
+      },
+      "functions": {
+        "codebase_specific": [],
+        "patterns": {},
+        "total": "number"
+      }
+    },
+    "go": {
+      "constants": {
+        "codebase_specific": [],
+        "patterns": {},
+        "total": "number"
+      },
+      "files": {
+        "codebase_specific": [],
+        "patterns": {
+          "other": {
+            "count": "number",
+            "pct": "number"
+          }
+        },
+        "total": "number"
+      },
+      "functions": {
+        "codebase_specific": [],
+        "patterns": {
+          "other": {
+            "count": "number",
+            "pct": "number"
+          }
+        },
+        "total": "number"
+      },
+      "methods": {
+        "codebase_specific": [],
+        "patterns": {},
+        "total": "number"
+      },
+      "types": {
+        "codebase_specific": [],
+        "patterns": {},
+        "total": "number"
+      }
+    },
+    "typescript": {
+      "classes": {
+        "codebase_specific": [],
+        "patterns": {},
+        "total": "number"
+      },
+      "constants": {
+        "codebase_specific": [],
+        "patterns": {},
+        "total": "number"
+      },
+      "files": {
+        "codebase_specific": [],
+        "patterns": {
+          "other": {
+            "count": "number",
+            "pct": "number"
+          }
+        },
+        "total": "number"
+      },
+      "functions": {
+        "codebase_specific": [],
+        "patterns": {
+          "other": {
+            "count": "number",
+            "pct": "number"
+          }
+        },
+        "total": "number"
+      }
+    }
+  },
+  "tests": {
+    "bash": {
+      "coverage_shape": {
+        "mapped": [],
+        "test_files_without_source_match": [],
+        "untested_source_files": [
+          "str"
+        ]
+      },
+      "framework": "str",
+      "naming": {
+        "class_pattern": "null",
+        "file_pattern": "null",
+        "function_pattern": "null"
+      },
+      "representative_test": "null",
+      "run_command": "str",
+      "source_files": "number",
+      "structure": {
+        "location": "str",
+        "mirrors_source": "bool",
+        "test_dir": "null"
+      },
+      "test_files": "number"
+    },
+    "go": {
+      "coverage_shape": {
+        "mapped": [],
+        "test_files_without_source_match": [],
+        "untested_source_files": [
+          "str"
+        ]
+      },
+      "framework": "str",
+      "naming": {
+        "class_pattern": "null",
+        "file_pattern": "null",
+        "function_pattern": "null"
+      },
+      "representative_test": "null",
+      "run_command": "str",
+      "source_files": "number",
+      "structure": {
+        "location": "str",
+        "mirrors_source": "bool",
+        "test_dir": "null"
+      },
+      "test_files": "number"
+    },
+    "typescript": {
+      "coverage_shape": {
+        "mapped": [],
+        "test_files_without_source_match": [],
+        "untested_source_files": [
+          "str"
+        ]
+      },
+      "framework": "str",
+      "naming": {
+        "class_pattern": "null",
+        "file_pattern": "null",
+        "function_pattern": "null"
+      },
+      "representative_test": "null",
+      "run_command": "str",
+      "source_files": "number",
+      "structure": {
+        "location": "str",
+        "mirrors_source": "bool",
+        "test_dir": "null"
+      },
+      "test_files": "number"
+    }
+  }
+}

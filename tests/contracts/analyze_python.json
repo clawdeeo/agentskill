@@ -1,0 +1,193 @@
+{
+  "config": {
+    "python": {
+      "linter": {
+        "config_file": "str",
+        "name": "str",
+        "settings": {}
+      }
+    }
+  },
+  "git": {
+    "error": "str",
+    "script": "str"
+  },
+  "graph": {
+    "monorepo_boundaries": {
+      "cross_service_imports": [],
+      "detected": "bool",
+      "services": []
+    },
+    "python": {
+      "boundary_violations": [],
+      "circular_dependencies": [],
+      "edges": [
+        {
+          "from": "str",
+          "line": "number",
+          "to": "str"
+        }
+      ],
+      "modules": [
+        "str"
+      ],
+      "most_depended_on": [
+        {
+          "dependents": "number",
+          "module": "str"
+        }
+      ],
+      "parse_errors": []
+    }
+  },
+  "measure": {
+    "python": {
+      "blank_lines": {
+        "after_class_declaration": {},
+        "after_imports": {
+          "distribution": {
+            "2": "number"
+          },
+          "mode": "number"
+        },
+        "between_methods": {},
+        "between_top_level_defs": {
+          "distribution": {
+            "2": "number"
+          },
+          "mode": "number"
+        }
+      },
+      "indentation": {
+        "mixed_files": [],
+        "size": "number",
+        "tab_files": [],
+        "unit": "str"
+      },
+      "line_length": {
+        "max": "number",
+        "p50": "number",
+        "p75": "number",
+        "p95": "number",
+        "p99": "number"
+      },
+      "trailing_newline": {
+        "absent": "number",
+        "present": "number"
+      },
+      "trailing_whitespace": {
+        "files_with_trailing_ws": "number"
+      }
+    }
+  },
+  "scan": {
+    "read_order": [
+      "str"
+    ],
+    "summary": {
+      "avg_depth": "number",
+      "by_language": {
+        "python": {
+          "file_count": "number",
+          "total_lines": "number"
+        }
+      },
+      "max_depth": "number",
+      "total_files": "number"
+    },
+    "tree": [
+      {
+        "depth": "number",
+        "language": "str",
+        "line_count": "number",
+        "path": "str",
+        "size_bytes": "number",
+        "type": "str"
+      }
+    ]
+  },
+  "symbols": {
+    "python": {
+      "classes": {
+        "codebase_specific": [],
+        "patterns": {},
+        "total": "number"
+      },
+      "constants": {
+        "codebase_specific": [],
+        "patterns": {
+          "SCREAMING_SNAKE_CASE": {
+            "count": "number",
+            "pct": "number"
+          }
+        },
+        "total": "number"
+      },
+      "files": {
+        "codebase_specific": [],
+        "patterns": {
+          "other": {
+            "count": "number",
+            "pct": "number"
+          },
+          "snake_case": {
+            "count": "number",
+            "pct": "number"
+          }
+        },
+        "total": "number"
+      },
+      "functions": {
+        "codebase_specific": [],
+        "patterns": {
+          "snake_case": {
+            "count": "number",
+            "pct": "number"
+          }
+        },
+        "total": "number"
+      },
+      "private_members": {
+        "double_underscore": "number",
+        "examples": [],
+        "single_underscore": "number"
+      }
+    }
+  },
+  "tests": {
+    "python": {
+      "coverage_shape": {
+        "mapped": [
+          {
+            "source": "str",
+            "test": "str"
+          }
+        ],
+        "test_files_without_source_match": [],
+        "untested_source_files": [
+          "str"
+        ]
+      },
+      "fixtures": {
+        "conftest_locations": [],
+        "fixture_names": [],
+        "uses_conftest": "bool"
+      },
+      "framework": "str",
+      "naming": {
+        "class_pattern": "null",
+        "file_pattern": "str",
+        "function_pattern": "str"
+      },
+      "representative_test": "str",
+      "run_command": "str",
+      "source_files": "number",
+      "structure": {
+        "location": "str",
+        "mirrors_source": "bool",
+        "test_dir": "str"
+      },
+      "test_files": "number"
+    }
+  }
+}

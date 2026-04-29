@@ -1,0 +1,37 @@
+{
+  "bash": {
+    "boundary_violations": [],
+    "circular_dependencies": [],
+    "edges": [],
+    "modules": [
+      "str"
+    ],
+    "most_depended_on": [],
+    "parse_errors": []
+  },
+  "go": {
+    "boundary_violations": [],
+    "circular_dependencies": [],
+    "edges": [],
+    "modules": [
+      "str"
+    ],
+    "most_depended_on": [],
+    "parse_errors": []
+  },
+  "monorepo_boundaries": {
+    "cross_service_imports": [],
+    "detected": "bool",
+    "services": []
+  },
+  "typescript": {
+    "boundary_violations": [],
+    "circular_dependencies": [],
+    "edges": [],
+    "modules": [
+      "str"
+    ],
+    "most_depended_on": [],
+    "parse_errors": []
+  }
+}

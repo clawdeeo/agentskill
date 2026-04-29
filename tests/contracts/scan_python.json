@@ -1,0 +1,26 @@
+{
+  "read_order": [
+    "str"
+  ],
+  "summary": {
+    "avg_depth": "number",
+    "by_language": {
+      "python": {
+        "file_count": "number",
+        "total_lines": "number"
+      }
+    },
+    "max_depth": "number",
+    "total_files": "number"
+  },
+  "tree": [
+    {
+      "depth": "number",
+      "language": "str",
+      "line_count": "number",
+      "path": "str",
+      "size_bytes": "number",
+      "type": "str"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "go": {
+    "formatter": {
+      "config_file": "null",
+      "name": "str",
+      "settings": {}
+    }
+  },
+  "typescript": {
+    "type_checker": {
+      "config_file": "str",
+      "name": "str",
+      "settings": {
+        "strict": "bool"
+      }
+    }
+  }
+}
