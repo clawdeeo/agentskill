@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-04-29
+
+### Added
+
+- `scripts/lib/generate_runner.py` — generate command to create AGENTS.md from repository analysis
+- `scripts/lib/interactive_runner.py` — interactive mode for AGENTS.md generation to prompt for missing inputs
+- `scripts/lib/reference_flow.py` — support for multiple reference repositories in analyze and generate commands
+- `scripts/lib/output_schema.py` — output schema validation with JSON Schema definitions
+- `scripts/lib/runner.py` — enhanced runner with generate command support
+- `scripts/lib/output.py` — output validation improvements
+- `cli.py` — `generate` subcommand with `--interactive` flag
+- Contract test fixtures for Python and mixed-language examples
+- `tests/contract_utils.py` — shared contract test helpers
+- `tests/contracts/` — JSON contract files for analyze, config, graph, scan, and symbols
+- `tests/test_generate_cli.py` — generate command CLI tests
+- `tests/test_interactive_flow.py` — interactive flow tests
+- `tests/test_output_schema.py` — output schema validation tests
+- `tests/test_output_contracts.py` — output contract tests
+- `tests/test_output.py` — expanded output validation tests
+
+### Changed
+
+- `cli.py` now exposes `generate` command alongside `analyze` and `update`
+- `scripts/lib/runner.py` updated to support generate command dispatch
+- `scripts/lib/output.py` enhanced with schema-based validation
+
+### Added (docs)
+
+- `AGENTS.md` and `SKILL.md` updated to clarify usage of examples from ClawHub
+
 ## [0.8.0] - 2026-04-29
 
 ### Added
