@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-04-30
+
+### Changed
+
+- Project restructured to idiomatic Python package layout: `scripts/` moved to `agentskill/` package
+- `cli.py` moved to `agentskill/main.py` as package entry point
+- `agentskill/__init__.py` added as package root
+- All imports updated from `scripts.*` to `agentskill.*`
+- `pyproject.toml` updated with `agentskill.main:main` console script entry point
+- `scripts/` directory retained with thin wrapper shims for backward compatibility
+- CI workflow updated to use correct module path
+- Tests updated to import from `agentskill` package
+
+### Added
+
+- `tests/test_scripts_layer.py` — backward compatibility test for scripts/ wrapper shims
+- `CHANGELOG.md` updated with historical entries
+
 ## [0.9.0] - 2026-04-29
 
 ### Added
