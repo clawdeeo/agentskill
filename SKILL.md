@@ -40,7 +40,7 @@ Do **not** invoke this skill for general code review, refactoring, or style advi
 | `SKILL.md` _(this file)_ | Operational spec: workflow, scripts, fallbacks, uncertainty handling                   |
 | `SYSTEM.md`              | Behavioral spec: what to generate, section by section, and how to evaluate it          |
 | `references/GOTCHAS.md`  | Extraction errors to avoid; update this file whenever a new failure mode is discovered |
-| `examples/`              | Reference `AGENTS.md` files; consult when handling an unfamiliar repo shape            |
+| `examples/`              | Analyzer fixtures plus reference `AGENTS.md` examples; consult when handling an unfamiliar repo shape |
 
 > **Maintenance rule:** If SYSTEM.md and SKILL.md ever contradict each other, SYSTEM.md wins. Fix SKILL.md to match.
 

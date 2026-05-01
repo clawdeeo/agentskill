@@ -14,26 +14,26 @@ The output is not advice. It is mimicry instructions.
 
 ## How It Works
 
-Seven analysis scripts run in parallel. Each extracts one class of signal that an LLM cannot derive reliably from reading source files alone:
+Seven analyzers run in parallel. Each extracts one class of signal that an LLM cannot derive reliably from reading source files alone:
 
-| Script       | What it measures                                                    |
-| ------------ | ------------------------------------------------------------------- |
-| `scan.py`    | Directory tree, file inventory, suggested read order                |
-| `measure.py` | Exact indentation, line length percentiles, blank line distributions |
-| `config.py`  | Formatter, linter, and type-checker detection with config excerpts  |
-| `git.py`     | Commit prefixes, branch naming, merge strategy, signing             |
-| `graph.py`   | Internal import graph, circular dependencies, most-depended modules |
-| `symbols.py` | Symbol name extraction, naming pattern clustering, affix detection  |
-| `tests.py`   | Test-to-source mapping, framework detection, fixture extraction     |
+| Analyzer  | What it measures                                                    |
+| --------- | ------------------------------------------------------------------- |
+| `scan`    | Directory tree, file inventory, suggested read order                |
+| `measure` | Exact indentation, line length percentiles, blank line distributions |
+| `config`  | Formatter, linter, and type-checker detection with config excerpts  |
+| `git`     | Commit prefixes, branch naming, merge strategy, signing             |
+| `graph`   | Internal import graph, circular dependencies, most-depended modules |
+| `symbols` | Symbol name extraction, naming pattern clustering, affix detection  |
+| `tests`   | Test-to-source mapping, framework detection, fixture extraction     |
 
-Script output feeds directly into `AGENTS.md` synthesis. The synthesis step follows the behavioral spec in [`SYSTEM.md`](./SYSTEM.md).
+Analyzer output feeds directly into `AGENTS.md` synthesis. The synthesis step follows the behavioral spec in [`SYSTEM.md`](./SYSTEM.md).
 
 ---
 
 ## Install
 
 ```bash
-pip install -e .
+pip install agentskill
 ```
 
 For local development:
@@ -125,6 +125,10 @@ local development after an editable install. The retained `scripts/*.py`
 wrappers exist for direct analyzer execution and skill/operator workflows; they
 are not the primary runtime surface.
 
+The published console entrypoint is `agentskill.main:main`. The packaged
+runtime under `agentskill/` is the source of truth for subcommand behavior,
+output contracts, generation, update flows, and reference handling.
+
 ### Update Workflow
 
 `agentskill update <repo>` analyzes the repository, regenerates AGENTS sections,
@@ -180,7 +184,7 @@ global learning.
 }
 ```
 
-Supported feedback keys are intentionally narrow in `0.7.0`:
+Supported feedback keys are intentionally narrow by design:
 
 - `sections.<name>.prepend_notes`
 - `sections.<name>.pinned_facts`
@@ -201,6 +205,8 @@ SYSTEM.md           # synthesis spec for generated AGENTS.md files
 SKILL.md            # operational workflow used by the skill
 pyproject.toml      # packaging, CLI entrypoint, tool configuration
 LICENSE
+docs/
+  reference/        # packaged API reference for contributors
 agentskill/
   main.py           # packaged CLI entry point — subcommand dispatch only
   commands/         # analyzer implementations
@@ -309,6 +315,22 @@ The `examples/` directory now serves two roles:
 If this skill was downloaded from ClawHub, or if `examples/` is not present in the local copy, do not consult it; skip that step to avoid execution errors.
 
 See [`examples/README.md`](./examples/README.md) for the supported fixture set.
+
+---
+
+## API Reference
+
+Static API reference for the packaged codebase lives under
+[`docs/reference/`](./docs/reference/README.md):
+
+- [`docs/reference/cli.md`](./docs/reference/cli.md) for the packaged CLI entrypoint and dispatch model
+- [`docs/reference/commands.md`](./docs/reference/commands.md) for analyzer command modules
+- [`docs/reference/library.md`](./docs/reference/library.md) for orchestration, generation, update, and reference helpers
+- [`docs/reference/common.md`](./docs/reference/common.md) for low-level registries and filesystem helpers
+
+The reference is contributor-oriented. It documents the packaged namespace and
+extension points that matter for real maintenance work without trying to expose
+every private helper as public API.
 
 ---
 
