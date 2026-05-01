@@ -129,33 +129,55 @@ The published console entrypoint is `agentskill.main:main`. The packaged
 runtime under `agentskill/` is the source of truth for subcommand behavior,
 output contracts, generation, update flows, and reference handling.
 
+### Choosing `analyze`, `generate`, or `update`
+
+Use `analyze` when you want machine-readable JSON from all analyzers and do not
+want to touch any markdown files. This is the contract-stable inspection path.
+
+Use `generate` when you want a fresh AGENTS draft from current analyzer output.
+It prints markdown to stdout by default, never merges with an existing
+`AGENTS.md`, and only writes a file when you pass `--out`.
+
+Use `update` when you already have an `AGENTS.md` and want deterministic
+regeneration plus preservation of untouched manual content. It writes back to
+`<repo>/AGENTS.md` by default, or to `--out` while still using the repo-local
+`AGENTS.md` as merge input.
+
+### Reference Workflow
+
+Both `analyze` and `generate` accept repeatable `--reference` flags. References
+are explicit inputs, not hidden priors.
+
+- Every local reference must point to a directory with a readable `AGENTS.md`.
+- Duplicate references are rejected instead of being silently counted twice.
+- `analyze --reference` validates references but does not change the JSON output
+  shape.
+- `generate --reference` preserves reference order in the emitted metadata block
+  so the provenance is inspectable.
+
+### Interactive Generation
+
+`generate --interactive` is opt-in guided gap filling. It asks a small number of
+targeted questions only when important signals are missing or ambiguous, then
+injects those answers into the generated markdown as explicit interactive notes.
+
+References can reduce prompt count when they clearly provide the missing
+convention. Conflicting references do not get auto-resolved; the command asks
+instead of guessing.
+
 ### Update Workflow
 
 `agentskill update <repo>` analyzes the repository, regenerates AGENTS sections,
 merges them with any existing `AGENTS.md`, and writes the result back to
-`<repo>/AGENTS.md` by default. Use `--section` to limit regeneration to one or
-more named sections, `--exclude-section` to keep specific generated sections
-untouched, and `--force` for a clean-slate rebuild that drops old custom
-sections instead of preserving them.
+`<repo>/AGENTS.md` by default.
 
-### Generate Workflow
-
-`agentskill generate <repo>` analyzes the repository and prints a fresh
-generated `AGENTS.md` document to stdout. Use `--out` to write that markdown to
-an explicit file path. Unlike `update`, `generate` does not merge with an
-existing `AGENTS.md` and does not write back to `<repo>/AGENTS.md` unless you
-explicitly choose an output path.
-
-Both `analyze` and `generate` also accept repeatable `--reference` flags. Local
-reference repositories must contain a readable `AGENTS.md`; when provided,
-`generate` embeds reference metadata in the rendered markdown and `analyze`
-validates the references without changing its JSON output shape.
-
-`generate --interactive` is opt-in guided gap filling. It asks a small number
-of targeted questions only when important signals are missing or ambiguous, then
-injects those answers into the generated markdown as explicit interactive notes.
-When references already provide those conventions, the prompt count drops
-accordingly.
+- Use `--section` to regenerate only named sections.
+- Use `--exclude-section` to keep generated sections untouched.
+- Missing targeted sections are inserted without rewriting unrelated manual
+  sections.
+- Untouched custom sections and preamble text stay in place in normal mode.
+- Use `--force` for a clean-slate rebuild that drops preserved/manual sections
+  and ignores preservation hints from feedback.
 
 ### Repo-Local Feedback
 
@@ -193,6 +215,11 @@ Supported feedback keys are intentionally narrow by design:
 In normal update mode, `preserve_sections` acts like an implicit exclusion list.
 In `--force` mode, those preservation hints are ignored so the command can
 produce a true clean-slate rebuild.
+
+Use `.agentskill-feedback.json` when you want durable, repo-local regeneration
+guidance that should survive future updates. Edit `AGENTS.md` directly when you
+are making one-off manual notes that should remain untouched unless you
+explicitly target or force-regenerate that section.
 
 ---
 

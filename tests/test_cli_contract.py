@@ -152,6 +152,79 @@ def test_analyze_invalid_reference_fails_with_stderr_only(tmp_path, capsys):
     assert captured.err == f"reference path does not exist: {missing}\n"
 
 
+def test_analyze_reference_missing_agents_file_fails_clearly(tmp_path, capsys):
+    repo = create_committed_sample_repo(tmp_path, name="target")
+    reference = create_repo(tmp_path, name="reference")
+    exit_code = main(["analyze", str(repo), "--reference", str(reference)])
+
+    assert exit_code == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == f"AGENTS.md not found in reference repository: {reference}\n"
+
+
+def test_analyze_rejects_duplicate_reference_sources(tmp_path, capsys):
+    repo = create_committed_sample_repo(tmp_path, name="target")
+    reference = create_repo(tmp_path, name="reference")
+    write(reference, "AGENTS.md", "# AGENTS\n\n## 12. Testing\nUse pytest.\n")
+
+    exit_code = main(
+        [
+            "analyze",
+            str(repo),
+            "--reference",
+            str(reference),
+            "--reference",
+            str(reference),
+        ]
+    )
+
+    assert exit_code == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == f"duplicate reference source: {reference}\n"
+
+
+def test_analyze_reference_order_does_not_change_json_output(tmp_path, capsys):
+    repo = create_committed_sample_repo(tmp_path, name="target")
+    reference_a = create_repo(tmp_path, name="reference-a")
+    reference_b = create_repo(tmp_path, name="reference-b")
+    write(reference_a, "AGENTS.md", "# AGENTS\n\n## 12. Testing\nUse pytest.\n")
+    write(reference_b, "AGENTS.md", "# AGENTS\n\n## 13. Git\nUse rebase.\n")
+
+    exit_code = main(
+        [
+            "analyze",
+            str(repo),
+            "--reference",
+            str(reference_a),
+            "--reference",
+            str(reference_b),
+            "--pretty",
+        ]
+    )
+
+    assert exit_code == 0
+    first = json.loads(capsys.readouterr().out)
+
+    exit_code = main(
+        [
+            "analyze",
+            str(repo),
+            "--reference",
+            str(reference_b),
+            "--reference",
+            str(reference_a),
+            "--pretty",
+        ]
+    )
+
+    assert exit_code == 0
+    second = json.loads(capsys.readouterr().out)
+
+    assert first == second
+
+
 def test_generate_non_interactive_does_not_prompt(tmp_path, capsys, monkeypatch):
     repo = create_repo(tmp_path)
 

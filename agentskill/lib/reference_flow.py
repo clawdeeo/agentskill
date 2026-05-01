@@ -1,5 +1,7 @@
 """Shared reference normalization and loading helpers for CLI flows."""
 
+from pathlib import Path
+
 from agentskill.lib.reference_initialization import successful_reference_documents
 from agentskill.lib.references import (
     REFERENCE_KIND_LOCAL,
@@ -26,16 +28,35 @@ def _reference_kind(value: str) -> str:
     return REFERENCE_KIND_LOCAL
 
 
+def _reference_identity(source: ReferenceSource) -> tuple[str, str]:
+    if source.kind == REFERENCE_KIND_LOCAL:
+        return source.kind, str(Path(source.value).resolve())
+
+    return source.kind, source.value
+
+
 def normalize_reference_sources(
     references: list[str] | None,
 ) -> list[ReferenceSource]:
     if not references:
         return []
 
-    return [
+    sources = [
         ReferenceSource(kind=_reference_kind(reference), value=reference)
         for reference in references
     ]
+
+    seen: set[tuple[str, str]] = set()
+
+    for source in sources:
+        identity = _reference_identity(source)
+
+        if identity in seen:
+            raise ValueError(f"duplicate reference source: {source.value}")
+
+        seen.add(identity)
+
+    return sources
 
 
 def load_reference_results(references: list[str] | None) -> list[ReferenceLoadResult]:

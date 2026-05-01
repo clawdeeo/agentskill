@@ -191,6 +191,53 @@ def test_generate_interactive_references_reduce_prompt_count(
     assert "Preferred merge strategy: `rebase`." in generated
 
 
+def test_generate_interactive_conflicting_references_prompt_for_ambiguous_gap(
+    tmp_path, capsys, monkeypatch
+):
+    repo = create_repo(tmp_path / "target")
+    reference_a = create_repo(tmp_path, name="reference-a")
+    reference_b = create_repo(tmp_path, name="reference-b")
+
+    write(
+        reference_a,
+        "AGENTS.md",
+        "# AGENTS\n\n## 12. Testing\n- Run command: `pytest`\n",
+    )
+
+    write(
+        reference_b,
+        "AGENTS.md",
+        "# AGENTS\n\n## 12. Testing\n- Run command: `python -m pytest`\n",
+    )
+
+    prompts: list[str] = []
+    answers = iter(["pytest -q", "feat:, fix:", "rebase"])
+
+    def fake_input(prompt: str) -> str:
+        prompts.append(prompt)
+        return next(answers)
+
+    monkeypatch.setattr(builtins, "input", fake_input)
+
+    exit_code = main(
+        [
+            "generate",
+            str(repo),
+            "--interactive",
+            "--reference",
+            str(reference_a),
+            "--reference",
+            str(reference_b),
+        ]
+    )
+
+    assert exit_code == 0
+    generated = capsys.readouterr().out
+    assert len(prompts) == 3
+    assert "canonical test command" in prompts[0].lower()
+    assert "Use `pytest -q` as the canonical test command." in generated
+
+
 def test_generate_reports_invalid_repo_path(tmp_path, capsys):
     missing = tmp_path / "missing"
     exit_code = main(["generate", str(missing)])
@@ -211,6 +258,59 @@ def test_generate_reports_invalid_reference_path(tmp_path, capsys):
     assert (
         f"Generate failed for repo {repo}: reference path does not exist: {missing}"
     ) in capsys.readouterr().err
+
+
+def test_generate_reports_missing_agents_file_in_reference_repo(tmp_path, capsys):
+    repo = create_sample_repo(tmp_path / "target")
+    reference = create_repo(tmp_path, name="reference")
+
+    exit_code = main(["generate", str(repo), "--reference", str(reference)])
+
+    assert exit_code == 1
+    assert (
+        f"Generate failed for repo {repo}: "
+        f"AGENTS.md not found in reference repository: {reference}"
+    ) in capsys.readouterr().err
+
+
+def test_generate_rejects_duplicate_reference_sources(tmp_path, capsys):
+    repo = create_sample_repo(tmp_path / "target")
+    reference = create_repo(tmp_path, name="reference")
+    write(reference, "AGENTS.md", "# AGENTS\n\n## 12. Testing\nUse pytest.\n")
+
+    exit_code = main(
+        [
+            "generate",
+            str(repo),
+            "--reference",
+            str(reference),
+            "--reference",
+            str(reference),
+        ]
+    )
+
+    assert exit_code == 1
+    assert (
+        f"Generate failed for repo {repo}: duplicate reference source: {reference}"
+    ) in capsys.readouterr().err
+
+
+def test_generate_reference_output_is_stable_across_repeated_runs(tmp_path, capsys):
+    repo = create_sample_repo(tmp_path / "target")
+    reference = create_repo(tmp_path, name="reference")
+    write(reference, "AGENTS.md", "# AGENTS\n\n## 12. Testing\nUse pytest.\n")
+
+    exit_code = main(["generate", str(repo), "--reference", str(reference)])
+    assert exit_code == 0
+    first = capsys.readouterr()
+
+    exit_code = main(["generate", str(repo), "--reference", str(reference)])
+    assert exit_code == 0
+    second = capsys.readouterr()
+
+    assert first.err == ""
+    assert second.err == ""
+    assert first.out == second.out
 
 
 def test_generate_rejects_pretty_flag(tmp_path, capsys):

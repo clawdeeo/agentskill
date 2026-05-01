@@ -106,3 +106,78 @@ def test_update_supports_custom_output_path(tmp_path, monkeypatch):
     assert exit_code == 0
     assert out_path.exists()
     assert not (repo / "AGENTS.md").exists()
+
+
+def test_update_preserves_manual_preamble_and_custom_sections_in_normal_mode(tmp_path):
+    repo = create_sample_repo(tmp_path)
+    write(
+        repo,
+        "AGENTS.md",
+        (
+            "Manual preamble.\n\n"
+            "## Team Notes\n"
+            "Keep this manual section.\n\n"
+            "## 12. Testing\n"
+            "Old testing.\n"
+        ),
+    )
+
+    exit_code = main(["update", str(repo), "--section", "testing"])
+
+    assert exit_code == 0
+    agents_text = (repo / "AGENTS.md").read_text()
+    assert agents_text.startswith("Manual preamble.\n\n## Team Notes\n")
+    assert "Keep this manual section.\n" in agents_text
+    assert "Old testing.\n" not in agents_text
+
+
+def test_update_adds_missing_targeted_section_without_rewriting_other_content(tmp_path):
+    repo = create_sample_repo(tmp_path)
+    write(
+        repo,
+        "AGENTS.md",
+        (
+            "# AGENTS\n\n"
+            "## 1. Overview\n"
+            "Manual overview.\n\n"
+            "## Team Notes\n"
+            "Keep these notes.\n"
+        ),
+    )
+
+    exit_code = main(["update", str(repo), "--section", "testing"])
+
+    assert exit_code == 0
+    agents_text = (repo / "AGENTS.md").read_text()
+    assert "Manual overview.\n" in agents_text
+    assert "Keep these notes.\n" in agents_text
+    assert "## 12. Testing\n" in agents_text
+
+
+def test_update_out_uses_existing_repo_agents_as_merge_input(tmp_path, monkeypatch):
+    repo = create_sample_repo(tmp_path)
+    write(
+        repo,
+        "AGENTS.md",
+        (
+            "Manual preamble.\n\n"
+            "## Team Notes\n"
+            "Keep this manual section.\n\n"
+            "## 12. Testing\n"
+            "Old testing.\n"
+        ),
+    )
+
+    monkeypatch.chdir(tmp_path)
+    out_path = Path("generated/AGENTS-new.md")
+
+    exit_code = main(
+        ["update", str(repo), "--section", "testing", "--out", str(out_path)]
+    )
+
+    assert exit_code == 0
+    generated = out_path.read_text()
+    assert generated.startswith("Manual preamble.\n\n## Team Notes\n")
+    assert "Keep this manual section.\n" in generated
+    assert "Old testing.\n" not in generated
+    assert "Old testing.\n" in (repo / "AGENTS.md").read_text()
