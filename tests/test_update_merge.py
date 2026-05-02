@@ -23,12 +23,12 @@ def test_merge_replaces_one_existing_section():
 
     assert result == MergeResult(
         text=(
-            "# Overview\n"
-            "Updated overview.\n"
-            "## Testing\n"
-            "Keep these notes.\n"
-            "## Git\n"
-            "Linear history.\n"
+            "# Overview\n\n"
+            "Updated overview.\n\n"
+            "## Testing\n\n"
+            "Keep these notes.\n\n"
+            "## Git\n\n"
+            "Linear history.\n\n"
         ),
         updated_sections=["overview"],
         preserved_sections=["testing", "git"],
@@ -60,12 +60,12 @@ def test_merge_replaces_multiple_sections_and_preserves_order():
     )
 
     assert result.text == (
-        "# Overview\n"
-        "New overview.\n"
-        "## Commands and Workflows\n"
-        "New commands.\n"
-        "## Testing\n"
-        "Old testing.\n"
+        "# Overview\n\n"
+        "New overview.\n\n"
+        "## Commands and Workflows\n\n"
+        "New commands.\n\n"
+        "## Testing\n\n"
+        "Old testing.\n\n"
     )
 
     assert result.updated_sections == ["overview", "commands and workflows"]
@@ -96,12 +96,12 @@ def test_merge_preserves_untouched_manual_edits_and_custom_sections():
 
     assert result.text == (
         "Manual preamble.\n\n"
-        "# Overview\n"
-        "Refreshed summary.\n"
-        "## Team Notes\n"
-        "Manual notes stay here.\n"
-        "## Testing\n"
-        "Locally edited testing text.\n"
+        "# Overview\n\n"
+        "Refreshed summary.\n\n"
+        "## Team Notes\n\n"
+        "Manual notes stay here.\n\n"
+        "## Testing\n\n"
+        "Locally edited testing text.\n\n"
     )
 
     assert result.preserved_sections == ["team notes", "testing"]
@@ -117,7 +117,10 @@ def test_merge_adds_missing_section_at_end():
         },
     )
 
-    assert result.text == ("# Overview\nSummary.\n## Testing\nAdded test guidance.\n")
+    assert result.text == (
+        "# Overview\n\nSummary.\n\n## Testing\n\nAdded test guidance.\n\n"
+    )
+
     assert result.updated_sections == []
     assert result.preserved_sections == ["overview"]
     assert result.added_sections == ["testing"]
@@ -135,7 +138,10 @@ def test_merge_include_only_filters_targets():
         include_sections=[" testing "],
     )
 
-    assert result.text == ("# Overview\nOld overview.\n## Testing\nNew testing.\n")
+    assert result.text == (
+        "# Overview\n\nOld overview.\n\n## Testing\n\nNew testing.\n\n"
+    )
+
     assert result.updated_sections == ["testing"]
     assert result.preserved_sections == ["overview"]
 
@@ -152,7 +158,10 @@ def test_merge_exclude_filters_targets():
         exclude_sections=["overview"],
     )
 
-    assert result.text == ("# Overview\nOld overview.\n## Testing\nNew testing.\n")
+    assert result.text == (
+        "# Overview\n\nOld overview.\n\n## Testing\n\nNew testing.\n\n"
+    )
+
     assert result.updated_sections == ["testing"]
     assert result.preserved_sections == ["overview"]
 
@@ -217,7 +226,7 @@ def test_force_mode_rebuilds_clean_slate():
     )
 
     assert result == MergeResult(
-        text="# Overview\nFresh overview.\n## Testing\nFresh testing.\n",
+        text="# Overview\n\nFresh overview.\n\n## Testing\n\nFresh testing.\n\n",
         updated_sections=["overview", "testing"],
         preserved_sections=[],
         added_sections=[],

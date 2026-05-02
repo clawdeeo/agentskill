@@ -236,7 +236,7 @@ def test_generate_non_interactive_does_not_prompt(tmp_path, capsys, monkeypatch)
 
     assert exit_code == 0
     captured = capsys.readouterr()
-    assert captured.out.startswith("# AGENTS\n\n## 1. Overview\n")
+    assert captured.out.startswith("# AGENTS.md\n\n## 1. Overview\n")
     assert captured.err == ""
 
 
@@ -254,7 +254,7 @@ def test_generate_out_writes_file_and_suppresses_stdout(tmp_path, monkeypatch, c
     assert (
         (tmp_path / "generated/AGENTS.md")
         .read_text()
-        .startswith("# AGENTS\n\n## 1. Overview\n")
+        .startswith("# AGENTS.md\n\n## 1. Overview\n")
     )
 
 
@@ -302,7 +302,9 @@ def test_update_default_behavior_writes_repo_file_without_stdout(tmp_path, capsy
     captured = capsys.readouterr()
     assert captured.out == ""
     assert captured.err == ""
-    assert (repo / "AGENTS.md").read_text().startswith("# AGENTS\n\n## 1. Overview\n")
+    assert (
+        (repo / "AGENTS.md").read_text().startswith("# AGENTS.md\n\n## 1. Overview\n")
+    )
 
 
 def test_update_out_writes_custom_file_without_stdout(tmp_path, monkeypatch, capsys):
@@ -351,7 +353,7 @@ def test_generate_and_update_preserve_distinct_public_semantics(tmp_path, capsys
     generate_repo = create_sample_repo(tmp_path / "generate-case")
     update_repo = create_sample_repo(tmp_path / "update-case")
 
-    manual_agents = "# AGENTS\n\n## Team Notes\nKeep this manual section.\n"
+    manual_agents = "# AGENTS.md\n\n## Team Notes\nKeep this manual section.\n"
     write(generate_repo, "AGENTS.md", manual_agents)
     write(update_repo, "AGENTS.md", manual_agents)
 
@@ -365,4 +367,4 @@ def test_generate_and_update_preserve_distinct_public_semantics(tmp_path, capsys
 
     assert update_exit_code == 0
     updated_text = (update_repo / "AGENTS.md").read_text()
-    assert "## Team Notes\nKeep this manual section.\n" in updated_text
+    assert "## Team Notes\n\nKeep this manual section.\n" in updated_text

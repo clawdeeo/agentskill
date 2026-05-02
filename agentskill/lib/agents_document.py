@@ -86,7 +86,7 @@ def parse_agents_document(text: str) -> AgentsDocument:
             current_heading is None
             and not preamble_lines
             and heading[0] == 1
-            and normalize_section_name(heading[1]) == "agents"
+            and normalize_section_name(heading[1]) in {"agents", "agents.md"}
         ):
             preamble_lines.append(line)
             continue
