@@ -9,23 +9,8 @@ permissions:
   id-token: write
 
 jobs:
-  verify:
-    name: Verify
-    uses: ./.github/workflows/verify.yml
-
-  build:
-    name: Build
-    needs: verify
-    uses: ./.github/workflows/build.yml
-
-  test:
-    name: Test
-    needs: build
-    uses: ./.github/workflows/test.yml
-
-  deploy:
-    name: Deploy
-    needs: test
+  pypi:
+    name: pypi
     runs-on: ubuntu-latest
 
     steps:
