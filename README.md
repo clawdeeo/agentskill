@@ -3,7 +3,7 @@
 Analyze a code repository and synthesize an `AGENTS.md` that lets any agent produce code indistinguishable from the existing codebase.
 
 <p align="center">
-  <img src="assets/agentskill.png" alt="agentskill" width="1280">
+  <img src="https://raw.githubusercontent.com/airscripts/agentskill/main/assets/agentskill.png" alt="agentskill" width="1280">
 </p>
 
 ---
