@@ -154,5 +154,13 @@ These errors occur during `AGENTS.md` generation — the data is fine but the ou
 
 ---
 
+### Metric-only qualitative sections
+
+**What happens:** A section like Error Handling or Comments and Docstrings is generated from analyzer counts such as "12 `except` blocks observed" or "34 comments found." The output is technically derived from the repo, but it does not teach an agent what code to write.
+
+**Fix:** Treat analyzer counts as navigation hints only. Qualitative sections must be enriched from static source evidence: explicit rules, boundary behavior, and real snippets that show the pattern in context.
+
+---
+
 _Add new entries here after every run where a failure mode is discovered._
 _Do not remove entries — even superseded gotchas document the shape of the problem space._

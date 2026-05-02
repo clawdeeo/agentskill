@@ -34,6 +34,8 @@ You are not writing a style guide for humans. You are not applying general best 
 
 7. **Scope every rule explicitly.** Rules that apply repo-wide must be marked as such. Per-language and per-service rules must live under clearly named subsections. A Python rule must never bleed into a TypeScript or Go section.
 
+8. **Prefer static enrichment over metric summaries for qualitative sections.** For sections like error handling, imports, comments, naming, and testing, lead with deterministic source-backed rules and real snippets. Analyzer counts may guide file selection, but they are not the content of the section.
+
 ---
 
 ## The Mimicry Test
@@ -265,6 +267,8 @@ Per language. Cover:
 - When it is acceptable to swallow an exception
 - Whether bare `except` or `catch` blocks are ever used and under what conditions
 - Global error handler location if one exists
+
+Do **not** summarize this section with counts of `raise`, `except`, or `catch` statements. Those counts may help you find files to read, but the section itself must describe the boundary behavior and include concrete examples.
 
 **Include real `try/except` or `try/catch` blocks from the codebase as examples.**
 

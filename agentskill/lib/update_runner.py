@@ -252,6 +252,19 @@ def _python_source_paths(scan: dict) -> list[str]:
     ]
 
 
+def _python_read_order(scan: dict) -> list[str]:
+    tree_paths = set(_python_source_paths(scan))
+    ordered = [
+        path for path in scan.get("read_order", []) if path in tree_paths and path
+    ]
+
+    for path in sorted(tree_paths):
+        if path not in ordered:
+            ordered.append(path)
+
+    return ordered
+
+
 def _render_type_annotations(repo: Path, analysis: dict) -> str:
     scan = analysis.get("scan", {})
     paths = _python_source_paths(scan)
@@ -319,22 +332,198 @@ def _render_imports(repo: Path, analysis: dict) -> str:
     return "```python\n" + block + "\n```\n"
 
 
-def _render_error_handling(repo: Path, analysis: dict) -> str:
+def _indentation(line: str) -> int:
+    return len(line) - len(line.lstrip(" "))
+
+
+def _trim_snippet(lines: list[str]) -> str:
+    start = 0
+    end = len(lines)
+
+    while start < end and not lines[start].strip():
+        start += 1
+
+    while end > start and not lines[end - 1].strip():
+        end -= 1
+
+    return "\n".join(lines[start:end]).rstrip()
+
+
+def _function_snippet(lines: list[str], anchor: int) -> str:
+    start = anchor
+
+    while start > 0:
+        candidate = lines[start].lstrip()
+
+        if candidate.startswith("def "):
+            break
+
+        start -= 1
+
+    base_indent = _indentation(lines[start]) if lines[start].strip() else 0
+    end = len(lines)
+
+    for index in range(start + 1, len(lines)):
+        stripped = lines[index].strip()
+
+        if not stripped:
+            continue
+
+        if _indentation(lines[index]) <= base_indent and not stripped.startswith("#"):
+            end = index
+            break
+
+    return _trim_snippet(lines[start:end])
+
+
+def _try_except_snippet(lines: list[str], anchor: int) -> str:
+    start = anchor
+
+    while start > 0:
+        if lines[start].lstrip().startswith("try:"):
+            break
+
+        start -= 1
+
+    if not lines[start].lstrip().startswith("try:"):
+        start = anchor
+
+    block_indent = _indentation(lines[start]) if lines[start].strip() else 0
+    end = len(lines)
+
+    for index in range(start + 1, len(lines)):
+        stripped = lines[index].strip()
+
+        if not stripped:
+            continue
+
+        if _indentation(lines[index]) <= block_indent and not stripped.startswith(
+            ("except", "finally", "else:")
+        ):
+            end = index
+            break
+
+    return _trim_snippet(lines[start:end])
+
+
+def _first_python_snippet(
+    repo: Path,
+    analysis: dict,
+    matcher,
+) -> str | None:
     scan = analysis.get("scan", {})
-    handlers = 0
-    raises = 0
 
-    for rel_path in scan.get("read_order", []):
+    for rel_path in _python_read_order(scan):
         content = read_text(repo / rel_path)
-        handlers += content.count("except ")
-        raises += content.count("raise ")
 
-    return (
-        "### Python\n\n"
-        f"- `except` blocks observed across representative files: `{handlers}`\n"
-        f"- `raise` statements observed across representative files: `{raises}`\n"
-        "- Preserve the local error-handling style instead of introducing new exception patterns opportunistically.\n"
+        if not content:
+            continue
+
+        lines = content.splitlines()
+        snippet = matcher(lines)
+
+        if snippet:
+            return snippet
+
+    return None
+
+
+def _value_error_snippet(repo: Path, analysis: dict) -> str | None:
+    def matcher(lines: list[str]) -> str | None:
+        for index, line in enumerate(lines):
+            if "raise ValueError(" in line:
+                return _function_snippet(lines, index)
+
+        return None
+
+    return _first_python_snippet(repo, analysis, matcher)
+
+
+def _error_payload_snippet(repo: Path, analysis: dict) -> str | None:
+    def matcher(lines: list[str]) -> str | None:
+        for index, line in enumerate(lines):
+            if 'return {"error":' in line and '"script"' in line:
+                return _function_snippet(lines, index)
+
+        return None
+
+    return _first_python_snippet(repo, analysis, matcher)
+
+
+def _logged_exception_snippet(repo: Path, analysis: dict) -> str | None:
+    def matcher(lines: list[str]) -> str | None:
+        for index, line in enumerate(lines):
+            if "logger.exception(" in line or (
+                "print(" in line and "file=sys.stderr" in line
+            ):
+                return _try_except_snippet(lines, index)
+
+        return None
+
+    return _first_python_snippet(repo, analysis, matcher)
+
+
+def _fallback_helper_snippet(repo: Path, analysis: dict) -> str | None:
+    def matcher(lines: list[str]) -> str | None:
+        for index, line in enumerate(lines):
+            stripped = line.strip()
+
+            if stripped not in {'return ""', "return 0"}:
+                continue
+
+            if index == 0 or lines[index - 1].strip() != "except Exception:":
+                continue
+
+            return _function_snippet(lines, index)
+
+        return None
+
+    return _first_python_snippet(repo, analysis, matcher)
+
+
+def _render_error_handling(repo: Path, analysis: dict) -> str:
+    snippets: list[str] = []
+    bullets: list[str] = []
+    value_error = _value_error_snippet(repo, analysis)
+    error_payload = _error_payload_snippet(repo, analysis)
+    logged_exception = _logged_exception_snippet(repo, analysis)
+    fallback_helper = _fallback_helper_snippet(repo, analysis)
+
+    if value_error:
+        bullets.append(
+            "- Low-level validators raise `ValueError` with specific message text for invalid caller input."
+        )
+        snippets.append("```python\n" + value_error + "\n```")
+
+    if error_payload:
+        bullets.append(
+            '- Analyzer boundaries convert validation failures into exact `{"error": ..., "script": ...}` payloads.'
+        )
+        snippets.append("```python\n" + error_payload + "\n```")
+
+    if logged_exception:
+        bullets.append(
+            "- Shared CLI wrappers catch broad exceptions, log or print diagnostics, and return non-zero status instead of letting failures escape unshaped."
+        )
+        snippets.append("```python\n" + logged_exception + "\n```")
+
+    if fallback_helper:
+        bullets.append(
+            '- Best-effort file helpers swallow unreadable-file exceptions and fall back to `""` or `0` so scans can continue.'
+        )
+        snippets.append("```python\n" + fallback_helper + "\n```")
+
+    if not bullets:
+        return (
+            "### Python\n\n"
+            "- No stable error-handling pattern could be extracted from the scanned Python files.\n"
+        )
+
+    bullets.append(
+        "- Match the existing boundary between raised validation errors and user-facing error payloads instead of introducing a new exception contract."
     )
+
+    return "### Python\n\n" + "\n".join(bullets) + "\n\n" + "\n\n".join(snippets) + "\n"
 
 
 def _render_comments_and_docstrings(repo: Path, analysis: dict) -> str:

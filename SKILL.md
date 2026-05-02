@@ -182,6 +182,8 @@ Follow SYSTEM.md **section by section**, in the exact order specified.
 | Directory structure                         | Script output from Step 2              |
 | Git conventions                             | `.git/` config + commit log inspection |
 
+For qualitative sections such as naming, imports, error handling, comments, and testing, enrich from static source evidence first: concrete rules plus real snippets. Use analyzer output to find candidate files, not as the section body.
+
 Apply the **Mimicry Test** from SYSTEM.md to each section before moving to the next. Do not batch-test at the end.
 
 ---
@@ -307,6 +309,7 @@ All scripts output JSON to stdout. Pass `--pretty` for human-readable output. Pa
 
 - **Extract, don't guess.** Every rule must be grounded in observed code.
 - **Snippets are the spec.** Every non-trivial rule needs a real code snippet.
+- **Static enrichment beats metric summaries.** Qualitative sections should read like observed code behavior, not analyzer tallies.
 - **3 examples minimum.** Fewer → `[tentative]`. Inconsistency → state it.
 - **Scope every rule.** Repo-wide vs. per-language vs. per-service — always explicit.
 - **No statistics in output.** No counts, percentages, or confidence levels in `AGENTS.md`.

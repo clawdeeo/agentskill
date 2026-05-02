@@ -350,32 +350,58 @@ from agentskill.main import main
 
 ### Python
 
-- Functions that validate filesystem or git state usually return structured error dicts instead of raising outward.
-- Small wrappers catch broad exceptions and convert them into machine-readable payloads.
-- File helpers return empty-string or zero fallbacks on read failure.
-- Tests assert exact error payloads rather than exception classes.
+- Low-level validators and normalization helpers raise `ValueError` with exact message text when the caller provides an invalid path or malformed feedback/config shape.
+- User-facing analyzer functions catch those validation failures at the command boundary and return exact two-key payloads shaped as `{"error": ..., "script": ...}`.
+- Shared CLI wrappers and aggregate runners catch broad exceptions, log or print diagnostics, and convert failures into a non-zero exit code or the same machine-readable error payload instead of letting tracebacks escape by default.
+- Best-effort filesystem helpers degrade quietly for unreadable files by returning `""` or `0`; walker and parser-style helpers also skip individual failures when continuing the scan is more useful than aborting.
+- Tests assert exact error strings and exact payload shape, not just exception type.
 
 ```python
-if not repo.exists():
-    return {"error": f"path does not exist: {repo_path}", "script": "git"}
+def validate_repo(path: str) -> Path:
+    repo = Path(path).resolve()
 
-if not (repo / ".git").exists():
-    return {"error": "not a git repository", "script": "git"}
+    if not repo.exists():
+        raise ValueError(f"path does not exist: {path}")
+
+    if not repo.is_dir():
+        raise ValueError(f"not a directory: {path}")
+
+    return repo
+```
+
+```python
+def scan(repo_path: str, lang_filter: str | None = None) -> dict:
+    try:
+        repo = validate_repo(repo_path)
+    except ValueError as exc:
+        return {"error": str(exc), "script": "scan"}
 ```
 
 ```python
 try:
     result = command_fn(repo, **kwargs)
 except Exception as exc:
+    logger.exception("Command %s failed for repo %s", script_name, repo)
     result = {"error": str(exc), "script": script_name}
 ```
 
 ```python
-def read_text(path: Path, max_bytes: int | None = None) -> str:
+def read_text(path: Path, max_bytes: int | None = MAX_FILE_BYTES) -> str:
     try:
-        content = path.read_text(errors="ignore")
+        with open(path, "rb") as file_obj:
+            raw = file_obj.read() if max_bytes is None else file_obj.read(max_bytes)
     except Exception:
         return ""
+
+    return raw.decode(errors="ignore")
+```
+
+```python
+try:
+    validate_feedback([])
+    raise AssertionError("should have raised ValueError")
+except ValueError as exc:
+    assert str(exc) == "feedback must be an object"
 ```
 
 ## 11. Comments and Docstrings
