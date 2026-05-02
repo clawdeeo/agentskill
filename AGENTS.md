@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-agentskill is a single-repo Python CLI that analyzes another repository and emits JSON signals used to synthesize an `AGENTS.md`. The codebase is organized around packaged runtime modules under `agentskill/`, a small direct-wrapper layer under `scripts/`, reference docs and examples at the repo root, and a separate `tests/` tree that exercises both analyzer internals and CLI entrypoints.
+agentskill is a single-repo Python CLI published from the `agsk` package metadata and exposed as the `agentskill` console command. It analyzes one or more repositories, emits structured analyzer output, and also supports direct `AGENTS.md` generation and in-place update flows. The codebase is organized around packaged runtime modules under `agentskill/`, thin direct wrappers under `scripts/`, reference specs and fixture repositories at the repo root, and a separate `tests/` tree that exercises analyzer internals, generation/update flows, and CLI entrypoints.
 
 ## 2. Repository Structure
 
@@ -11,7 +11,7 @@ agentskill/
   agentskill/
     main.py                 # packaged CLI entry point; argument parsing and dispatch only
     commands/               # analyzer implementations
-    lib/                    # orchestration, output, update, generation helpers
+    lib/                    # orchestration, output, reference, generation, and update helpers
     common/                 # shared low-level helpers and registries
   pyproject.toml            # packaging, pytest, ruff, coverage config
   README.md                 # user-facing overview and command reference
@@ -22,9 +22,10 @@ agentskill/
   references/
     GOTCHAS.md              # extraction and synthesis failure modes
   examples/
-    SINGLE_LANGUAGE.md      # reference output for a standard single-language repo
-    MULTI_LANGUAGE.md       # reference output for a multi-language single repo
-    MONOREPO.md             # reference output for a monorepo
+    python/                 # fixture repository used by analyzer tests
+    javascript/             # fixture repository for JS/TS detection paths
+    mixed/                  # multi-language fixture repository
+    ...                     # additional per-language example repos
   scripts/
     scan.py                 # thin direct-execution wrapper
     measure.py              # thin direct-execution wrapper
@@ -39,30 +40,32 @@ agentskill/
 ```
 
 - New analyzer logic goes in `agentskill/commands/`, not in entrypoint wrappers.
-- Shared CLI plumbing belongs in `agentskill/lib/`; low-level reusable helpers belong in `agentskill/common/`.
+- Shared CLI plumbing, generation, reference adaptation, and update flows belong in `agentskill/lib/`; low-level reusable helpers belong in `agentskill/common/`.
 - Files under `scripts/*.py` stay as thin wrappers around `agentskill.commands.<name>.main`.
 - New tests go in `tests/` as `test_<subject>.py`; this repo does not colocate tests beside source files.
-- New examples for unfamiliar repo shapes belong in `examples/`, not mixed into `references/`.
-  If this skill was downloaded from ClawHub, or if `examples/` is unavailable locally, do not consult `examples/`; skip it to avoid execution errors.
+- New fixture repos or language-shape examples belong in `examples/`, not mixed into `references/`.
+- Specs and extraction notes belong in `README.md`, `SYSTEM.md`, `SKILL.md`, and `references/`, not inside runtime modules.
 - Keep the repo root small: metadata, docs/spec files, and no business logic outside `agentskill/`.
 
 ## 5. Commands and Workflows
 
 ```bash
-# Install editable package
-pip install -e .
+# Install editable package with dev tooling
+python -m pip install -e '.[dev]'
 
-# Install dev dependencies from project metadata
-python -m pip install -r <(python - <<'PY'
-import tomllib
-with open("pyproject.toml", "rb") as f:
-    deps = tomllib.load(f)["project"]["optional-dependencies"]["dev"]
-print("\n".join(deps))
-PY
-)
+# Optional local hooks
+pre-commit install
 
 # Run all analyzers
 agentskill analyze <repo> --pretty
+
+# Generate or update markdown
+agentskill generate <repo>
+agentskill generate <repo> --out AGENTS.md
+agentskill generate <repo> --interactive
+agentskill update <repo>
+agentskill update <repo> --section testing
+agentskill update <repo> --force
 
 # Run individual analyzers through the installed CLI
 agentskill scan <repo> --pretty
@@ -79,13 +82,15 @@ python scripts/scan.py <repo> --pretty
 # Local checks
 ruff format .
 ruff check .
+mypy
 pytest
 ```
 
-- `agentskill analyze <repo> --pretty` is the canonical aggregate workflow.
+- `python -m pip install -e '.[dev]'` is the documented development install path; use it instead of reconstructing the dev dependency list manually.
+- `agentskill analyze <repo> --pretty` is the canonical aggregate analyzer workflow.
+- `agentskill generate <repo>` is the fresh-draft path; `agentskill update <repo>` is the in-place merge/preservation path.
 - `agentskill <command> <repo> --pretty` is the main single-analyzer interface; `python scripts/<name>.py <repo> --pretty` remains supported as a thin direct wrapper.
-- Use `pytest` as the canonical test command; that is what the repo advertises in `README.md` and what the analyzer detects from `pyproject.toml`.
-- Use `ruff format .` and `ruff check .` for local formatting and lint passes; Ruff is the only configured code-quality tool in project metadata.
+- Use `ruff format .`, `ruff check .`, `mypy`, and `pytest` as the canonical local verification stack.
 
 ## 6. Code Formatting
 
@@ -433,33 +438,36 @@ def write(repo: Path, rel_path: str, content: str) -> Path:
 
 ## 13. Git
 
-- Commit subjects follow conventional-commit-style prefixes without scopes in normal repo history: `refactor:`, `feat:`, `docs:`, `fix:`, `chore:`, `test:`.
+- Commit subjects follow conventional-commit-style prefixes. Dominant prefixes in current history are `feat:`, `refactor:`, `docs:`, `release:`, `fix:`, `chore:`, and smaller amounts of `ci:`, `test:`, `style:`, `deps:`, and `build:`.
 - Branch names use a slash-separated prefix pattern when they are not trunk branches.
-- History is linear enough that the analyzer detects a rebase workflow rather than merge commits.
+- The current analyzer output detects merge commits rather than a pure rebase-only history, so do not write process notes that assume a strictly linear workflow.
 - Commit bodies exist, but not on every commit.
 
 Examples from current history:
 
 ```text
-refactor: code clean up
-feat: add AGENTS.md file
-docs: mark all roadmap items complete
-fix: add missing frontmatter to SKILL.md
+feat: release version 1.0.0 with updated build workflow and CLI command name
+refactor: update project structure moving to an idiomatic one
+docs: add comprehensive API and CLI documentation with reference examples
+fix: update tag validation in release workflow to use regex for version extraction
 ```
 
 Branch example:
 
 ```text
-chore/strip-comments
+docs/changelog-0.2.0
 ```
 
 ## 14. Dependencies and Tooling
 
 - Packaging uses `setuptools.build_meta` with `setuptools>=68` in `build-system.requires`.
 - The published console script is `agentskill = "agentskill.main:main"`.
+- The distribution package name is `agsk`.
 - Runtime requirement is Python `>=3.10`.
-- Dev dependencies include `mypy`, `pre-commit`, `pytest`, `pytest-cov`, `ruff`, and typing/config support packages.
+- Runtime dependencies include `tomli` and `PyYAML` for Python `<3.11`.
+- Dev dependencies include `mypy`, `pre-commit`, `pytest`, `pytest-cov`, `ruff`, `tomli`, `PyYAML`, and `types-PyYAML`.
 - Ruff targets `py39`, excludes cache and virtualenv directories, and lint rules are configured in `pyproject.toml` with `select = ["B", "C4", "E4", "E7", "E9", "F", "I", "N", "SIM", "UP", "W"]` and `ignore = ["E402"]`.
+- `mypy` is configured in `pyproject.toml` for `agentskill`, `scripts`, and `tests` with `check_untyped_defs = true`, `warn_unused_ignores = true`, `warn_redundant_casts = true`, `warn_unreachable = true`, and `show_error_codes = true`.
 - Coverage omits `tests/*`.
 - License is MIT.
 
@@ -469,8 +477,8 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "agentskill"
-version = "0.8.0"
+name = "agsk"
+version = "1.0.0"
 requires-python = ">=3.10"
 
 [project.scripts]
@@ -494,4 +502,6 @@ ignore = ["E402"]
 - Do not switch quote style to single quotes in ordinary Python code.
 - Do not start using wildcard imports or `__future__` imports without a repo-wide reason.
 - Do not rely on exceptions escaping CLI/output wrappers when the existing pattern returns `{"error": ..., "script": ...}` payloads.
-- Do not fold example reference files into `references/` or analyzer code; keep sample outputs in `examples/`.
+- Do not fold example fixture repos into `references/` or analyzer code; keep repo-shaped fixtures in `examples/`.
+- Do not bypass `agentskill/lib/` by adding generation or update orchestration directly to wrappers under `scripts/`.
+- Do not assume `python -m agentskill.main` is a supported operator path; the supported surfaces are the installed `agentskill` console script, direct wrapper scripts, and direct `main([...])` invocation in tests.
