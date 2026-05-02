@@ -2,6 +2,10 @@
 
 Analyze a code repository and synthesize an `AGENTS.md` that lets any agent produce code indistinguishable from the existing codebase.
 
+<p align="center">
+  <img src="assets/agentskill.png" alt="agentskill" width="1280">
+</p>
+
 ---
 
 ## Table of Contents
