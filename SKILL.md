@@ -260,6 +260,9 @@ Everything else — error handling patterns, comment style, docstring format, ar
 All scripts require Python stdlib only. No installation needed beyond `pip install -e .`.
 
 ```bash
+# Aggregate analyzer wrapper
+python scripts/analyze.py <repo>
+
 # Directory tree and file inventory
 python scripts/scan.py <repo>
 
@@ -282,7 +285,13 @@ python scripts/symbols.py <repo>
 # Test-to-source mapping, framework detection, fixture extraction
 python scripts/tests.py <repo>
 
-# Run all seven in parallel and merge output
+# Fresh AGENTS.md draft
+python scripts/generate.py <repo>
+
+# Update or create AGENTS.md in place
+python scripts/update.py <repo>
+
+# Run all seven analyzers in parallel and merge output
 agentskill analyze <repo> --pretty
 ```
 

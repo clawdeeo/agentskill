@@ -27,6 +27,7 @@ agentskill/
     mixed/                  # multi-language fixture repository
     ...                     # additional per-language example repos
   scripts/
+    analyze.py              # thin direct-execution wrapper to packaged CLI
     scan.py                 # thin direct-execution wrapper
     measure.py              # thin direct-execution wrapper
     config.py               # thin direct-execution wrapper
@@ -34,6 +35,8 @@ agentskill/
     graph.py                # thin direct-execution wrapper
     symbols.py              # thin direct-execution wrapper
     tests.py                # thin direct-execution wrapper
+    generate.py             # thin direct-execution wrapper to packaged CLI
+    update.py               # thin direct-execution wrapper to packaged CLI
   tests/                    # pytest suite; separate tree, not colocated
     conftest.py             # sys.path test bootstrap
     test_support.py         # shared repo/setup helpers for tests
@@ -41,7 +44,7 @@ agentskill/
 
 - New analyzer logic goes in `agentskill/commands/`, not in entrypoint wrappers.
 - Shared CLI plumbing, generation, reference adaptation, and update flows belong in `agentskill/lib/`; low-level reusable helpers belong in `agentskill/common/`.
-- Files under `scripts/*.py` stay as thin wrappers around `agentskill.commands.<name>.main`.
+- Files under `scripts/*.py` stay as thin wrappers around packaged command entrypoints such as `agentskill.commands.<name>.main` or `agentskill.main`.
 - New tests go in `tests/` as `test_<subject>.py`; this repo does not colocate tests beside source files.
 - New fixture repos or language-shape examples belong in `examples/`, not mixed into `references/`.
 - Specs and extraction notes belong in `README.md`, `SYSTEM.md`, `SKILL.md`, and `references/`, not inside runtime modules.
@@ -77,7 +80,10 @@ agentskill symbols <repo> --pretty
 agentskill tests <repo> --pretty
 
 # Direct wrapper execution
+python scripts/analyze.py <repo> --pretty
 python scripts/scan.py <repo> --pretty
+python scripts/generate.py <repo>
+python scripts/update.py <repo>
 
 # Local checks
 ruff format .

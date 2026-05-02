@@ -249,8 +249,11 @@ agentskill update <repo> --force
 agentskill update <repo> --out updated-AGENTS.md
 
 # Retained wrapper entrypoints for operator/skill workflows
+python scripts/analyze.py <repo> --pretty
 python scripts/scan.py <repo> --pretty
 python scripts/measure.py <repo> --lang python --pretty
+python scripts/generate.py <repo>
+python scripts/update.py <repo>
 ```
 
 The installed `agentskill` command is the steady-state CLI surface, including
@@ -444,8 +447,8 @@ When you add or extend functionality:
 For retained wrappers:
 
 - Use `agentskill <command> ...` as the canonical interface in docs and examples.
-- Use `python scripts/<name>.py ...` only for direct analyzer wrappers that still exist.
-- Do not add `generate` or `update` logic to `scripts/`; those belong to the packaged CLI.
+- Use `python scripts/<name>.py ...` only for retained thin wrappers that still exist.
+- Keep `generate` and `update` wrappers thin; packaged CLI behavior must still live under `agentskill/`.
 
 ---
 
