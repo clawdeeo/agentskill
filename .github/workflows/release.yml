@@ -42,12 +42,19 @@ jobs:
 
         run: |
           python - <<'PY'
-          import tomllib
+          import re
           from pathlib import Path
 
-          with Path("pyproject.toml").open("rb") as f:
-              version = tomllib.load(f)["project"]["version"]
+          pyproject = Path("pyproject.toml").read_text()
+          match = re.search(
+              r'(?ms)^\[project\]\s+.*?^version = "([^"]+)"',
+              pyproject,
+          )
 
+          if match is None:
+              raise SystemExit("could not read project.version from pyproject.toml")
+
+          version = match.group(1)
           expected = f"refs/tags/{version}"
           actual = "${{ github.ref }}"
 
