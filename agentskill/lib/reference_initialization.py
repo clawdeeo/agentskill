@@ -17,7 +17,7 @@ from agentskill.lib.references import (
     ReferenceMetadata,
 )
 
-AGENTSKILL_VERSION = "1.2.0"
+AGENTSKILL_VERSION = "1.3.0"
 
 
 def successful_reference_documents(

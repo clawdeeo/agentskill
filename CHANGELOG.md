@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-05-02
+
+### Added
+
+- Direct execution wrappers for `analyze`, `generate`, and `update` scripts (`scripts/analyze.py`, `scripts/generate.py`, `scripts/update.py`)
+- CI and release workflow badges in README
+
+### Changed
+
+- PyPI deployment switched to API-based publish
+- Release workflow adds attestations flag to deployment step
+- Deploy workflow permissions clarified
+
+### Fixed
+
+- README image source updated to use absolute URL
+- Missing permissions on release workflow
+- Expected script names updated in directory test
+
 ## [1.2.0] - 2026-05-02
 
 ### Added
