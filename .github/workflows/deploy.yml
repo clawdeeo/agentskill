@@ -2,15 +2,14 @@ name: Deploy
 
 on:
   workflow_call:
+    secrets:
+      PYPI_API_TOKEN:
+        required: true
 
 jobs:
   pypi:
     name: PyPI
     runs-on: ubuntu-latest
-
-    permissions:
-      id-token: write
-      contents: read
 
     steps:
       - uses: actions/download-artifact@v6
@@ -22,3 +21,7 @@ jobs:
 
       - name: Deploy
         uses: pypa/gh-action-pypi-publish@release/v1
+
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}

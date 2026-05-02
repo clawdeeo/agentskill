@@ -1,12 +1,10 @@
 name: Release
 
 on:
+  workflow_dispatch:
+
   push:
     tags: ["*"]
-
-permissions:
-  contents: read
-  id-token: write
 
 jobs:
   verify:
@@ -26,4 +24,5 @@ jobs:
   deploy:
     name: Deploy
     needs: test
+    secrets: inherit
     uses: ./.github/workflows/deploy.yml
