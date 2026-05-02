@@ -33,8 +33,10 @@ Analyzer output feeds directly into `AGENTS.md` synthesis. The synthesis step fo
 ## Install
 
 ```bash
-pip install agentskill
+pip install agsk
 ```
+
+This installs the `agentskill` CLI command.
 
 For local development:
 

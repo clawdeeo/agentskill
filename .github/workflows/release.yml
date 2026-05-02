@@ -1,0 +1,68 @@
+name: Release
+
+on:
+  push:
+    tags: ["*"]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  verify:
+    name: Verify
+    uses: ./.github/workflows/verify.yml
+
+  build:
+    name: Build
+    needs: verify
+    uses: ./.github/workflows/build.yml
+
+  test:
+    name: Test
+    needs: build
+    uses: ./.github/workflows/test.yml
+
+  deploy:
+    name: Deploy
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        name: Checkout Code
+
+      - uses: actions/setup-python@v6
+        name: Setup Python
+
+        with:
+          python-version: "3.10"
+
+      - name: Validate Tag
+
+        run: |
+          python - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          with Path("pyproject.toml").open("rb") as f:
+              version = tomllib.load(f)["project"]["version"]
+
+          expected = f"refs/tags/{version}"
+          actual = "${{ github.ref }}"
+
+          if actual != expected:
+              raise SystemExit(
+                  f"tag/version mismatch: expected {expected}, got {actual}"
+              )
+          PY
+
+      - uses: actions/download-artifact@v4
+        name: Download Distribution
+
+        with:
+          name: dist
+          path: dist
+
+      - name: Deploy
+        uses: pypa/gh-action-pypi-publish@release/v1

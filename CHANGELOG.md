@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-05-01
+
+### Added
+
+- Verified source and wheel build flow for the packaged `agentskill` runtime
+- Verified install-from-artifact smoke path for `agentskill --help`, `analyze`, and `generate`
+- Tag-triggered GitHub Actions publish workflow for PyPI releases
+
+### Changed
+
+- Bumped packaged version to `1.0.0`
+- Renamed the published PyPI distribution to `agsk` while preserving the `agentskill` CLI command
+- Reference metadata emitted by reference-aware generation now reports the `1.0.0` agentskill version
+- Finalized milestone release notes around the stable CLI contract, packaged runtime layout, direct `generate`, incremental `update`, reference-aware generation, interactive gap filling, verified language matrix, and PyPI distribution
+
 ## [0.10.0] - 2026-04-30
 
 ### Changed
