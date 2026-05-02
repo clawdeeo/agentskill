@@ -12,7 +12,7 @@ def test_update_creates_agents_file_when_missing(tmp_path):
     assert exit_code == 0
 
     agents_text = (repo / "AGENTS.md").read_text()
-    assert agents_text.startswith("# AGENTS\n\n## 1. Overview\n")
+    assert agents_text.startswith("# AGENTS.md\n\n## 1. Overview\n")
     assert "## 5. Commands and Workflows\n" in agents_text
     assert "## 12. Testing\n" in agents_text
 
@@ -75,7 +75,7 @@ def test_update_force_rebuild_drops_custom_sections(tmp_path):
 
     agents_text = (repo / "AGENTS.md").read_text()
     assert "Team Notes" not in agents_text
-    assert agents_text.startswith("# AGENTS\n\n## 1. Overview\n")
+    assert agents_text.startswith("# AGENTS.md\n\n## 1. Overview\n")
 
 
 def test_update_rejects_conflicting_include_and_exclude(tmp_path, capsys):

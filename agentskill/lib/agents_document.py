@@ -123,7 +123,22 @@ def serialize_agents_document(document: AgentsDocument) -> str:
 
     for section in document.sections:
         parts.append(f"{'#' * section.heading_level} {section.heading_text}\n")
-        parts.append(section.body)
+        body = section.body
+
+        if not body:
+            parts.append("\n")
+            continue
+
+        if not body.startswith("\n"):
+            parts.append("\n")
+
+        parts.append(body)
+
+        if not body.endswith("\n"):
+            parts.append("\n")
+
+        if not body.endswith("\n\n"):
+            parts.append("\n")
 
     return "".join(parts)
 

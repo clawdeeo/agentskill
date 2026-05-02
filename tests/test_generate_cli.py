@@ -18,8 +18,10 @@ def test_generate_prints_markdown_to_stdout_without_writing_repo_file(tmp_path, 
 
     assert exit_code == 0
     captured = capsys.readouterr()
-    assert captured.out.startswith("# AGENTS\n\n## 1. Overview\n")
+    assert captured.out.startswith("# AGENTS.md\n\n## 1. Overview\n")
+    assert "\n\n## 2. Repository Structure\n" in captured.out
     assert "## 5. Commands and Workflows\n" in captured.out
+    assert "## 6. Code Formatting\n\n### Python\n" in captured.out
     assert not (repo / "AGENTS.md").exists()
     assert captured.err == ""
 
@@ -35,7 +37,7 @@ def test_generate_writes_markdown_to_explicit_output_path(
 
     assert exit_code == 0
     assert out_path.exists()
-    assert out_path.read_text().startswith("# AGENTS\n\n## 1. Overview\n")
+    assert out_path.read_text().startswith("# AGENTS.md\n\n## 1. Overview\n")
     assert capsys.readouterr().out == ""
     assert not (repo / "AGENTS.md").exists()
 
@@ -52,7 +54,7 @@ def test_generate_ignores_existing_agents_file_and_does_not_merge(tmp_path, caps
 
     assert exit_code == 0
     generated = capsys.readouterr().out
-    assert generated.startswith("# AGENTS\n\n## 1. Overview\n")
+    assert generated.startswith("# AGENTS.md\n\n## 1. Overview\n")
     assert "Team Notes" not in generated
 
 
@@ -65,7 +67,7 @@ def test_generate_includes_reference_metadata_block(tmp_path, capsys):
 
     assert exit_code == 0
     generated = capsys.readouterr().out
-    assert generated.startswith("# AGENTS\n\n<!-- agentskill-metadata\n")
+    assert generated.startswith("# AGENTS.md\n\n<!-- agentskill-metadata\n")
     assert f'"value": "{reference}"' in generated
     assert "## 1. Overview\n" in generated
 

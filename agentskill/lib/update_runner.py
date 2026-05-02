@@ -20,7 +20,7 @@ from agentskill.lib.update_feedback import (
 from agentskill.lib.update_merge import merge_agents_document
 
 AGENTS_FILENAME = "AGENTS.md"
-DOCUMENT_TITLE = "# AGENTS\n\n"
+DOCUMENT_TITLE = "# AGENTS.md\n\n"
 
 SECTION_ORDER = [
     "overview",
