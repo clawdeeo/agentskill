@@ -59,6 +59,9 @@ Seven analyzers run in parallel. Each extracts one class of signal that an LLM c
 
 Analyzer output feeds directly into `AGENTS.md` synthesis. The synthesis step follows the behavioral spec in [`SYSTEM.md`](./SYSTEM.md).
 
+> Check our latest technical article for a deeper dive:
+> [Turning Repository Knowledge Into Usable Agent Context](https://dev.to/airscript/turning-repository-knowledge-into-usable-agent-context-4pe4).
+
 ---
 
 ## Supported Languages
