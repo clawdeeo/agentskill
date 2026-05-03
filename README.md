@@ -29,6 +29,7 @@ Analyze a code repository and synthesize an `AGENTS.md` that lets any agent prod
 - [API Reference](#api-reference)
 - [Contributing](#contributing)
 - [Security](#security)
+- [Statistics](#statistics)
 - [Support](#support)
 - [License](#license)
 
