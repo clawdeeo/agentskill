@@ -538,3 +538,7 @@ supporting through GitHub Sponsors all help.
 ## License
 
 MIT
+
+## Download History
+
+[![Download History](https://skill-history.com/chart/airscripts/agentskill.svg)](https://skill-history.com/airscripts/agentskill)
