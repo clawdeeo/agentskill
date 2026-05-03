@@ -2,6 +2,7 @@
 
 [![Main](https://github.com/airscripts/agentskill/actions/workflows/main.yml/badge.svg)](https://github.com/airscripts/agentskill/actions/workflows/main.yml)
 [![Release](https://github.com/airscripts/agentskill/actions/workflows/release.yml/badge.svg)](https://github.com/airscripts/agentskill/actions/workflows/release.yml)
+![ClawHub](https://skill-history.com/badge/airscripts/agentskill.svg)
 
 Analyze a code repository and synthesize an `AGENTS.md` that lets any agent produce code indistinguishable from the existing codebase.
 
@@ -523,6 +524,14 @@ For supported versions and vulnerability reporting guidance, see
 
 ---
 
+## Statistics
+
+This is the current star history progress of the project:
+
+[![Star History Chart](https://api.star-history.com/chart?repos=airscripts/agentskill&type=date&legend=top-left)](https://www.star-history.com/?repos=airscripts%2Fagentskill&type=date&legend=top-left)
+
+---
+
 ## Support
 
 Project metadata and support files available in this repository include:
@@ -538,7 +547,3 @@ supporting through GitHub Sponsors all help.
 ## License
 
 MIT
-
-## Download History
-
-[![Download History](https://skill-history.com/chart/airscripts/agentskill.svg)](https://skill-history.com/airscripts/agentskill)
