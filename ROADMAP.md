@@ -165,3 +165,20 @@ completed items instead of turning this file into a changelog.
 - Add unified JSON output across commands where practical
 - Improve automation-friendly distribution and integration surfaces
 - Strengthen CI adoption paths without introducing breaking CLI changes
+
+---
+
+## 1.15.0 — Output Profiles
+
+**Theme:** let users choose the right `AGENTS.md` density without sacrificing structure or synthesis quality.
+
+- Add output-length/profile selection for generated `AGENTS.md` files
+- Support concise mode for high-signal operational guidance
+- Support comprehensive mode for richer conventions, examples, and reference detail
+- Keep generation grounded in the same extracted repository facts across profiles
+- Preserve a stable core section structure across short and long outputs
+- Define clear boundaries for what belongs in concise vs comprehensive output
+- Prefer concise output as the default generation mode
+- Add optional split output mode for concise `AGENTS.md` plus linked extended reference doc
+- Ensure profile choice affects presentation density, not underlying analyzer conclusions
+- Keep user control explicit while maintaining opinionated information architecture
