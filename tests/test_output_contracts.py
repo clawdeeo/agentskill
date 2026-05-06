@@ -563,19 +563,22 @@ class TestUnsupportedCombinations:
         assert exit_code == 1
         assert "unsupported output profile" in capsys.readouterr().err
 
-    def test_split_without_out_fails(self, tmp_path, capsys):
+    def test_split_without_out_defaults_to_repo(self, tmp_path):
         repo = create_sample_repo(tmp_path)
         exit_code = main(["generate", str(repo), "--layout", "split"])
 
-        assert exit_code == 1
-        assert "--out" in capsys.readouterr().err
+        assert exit_code == 0
+        assert (repo / "AGENTS.md").exists()
+        assert (repo / "AGENTS.reference.md").exists()
 
-    def test_multifile_without_out_fails(self, tmp_path, capsys):
+    def test_multifile_without_out_defaults_to_repo(self, tmp_path):
         repo = create_sample_repo(tmp_path)
         exit_code = main(["generate", str(repo), "--layout", "multifile"])
 
-        assert exit_code == 1
-        assert "--out" in capsys.readouterr().err
+        assert exit_code == 0
+        assert (repo / "AGENTS.md").exists()
+        assert (repo / ".agentskill").is_dir()
+        assert (repo / ".agentskill" / "01_OVERVIEW.md").exists()
 
     def test_update_layout_split_rejected(self, tmp_path, capsys):
         repo = create_sample_repo(tmp_path)

@@ -275,8 +275,8 @@ agentskill generate <repo> --reference ../ref-a --reference ../ref-b
 agentskill generate <repo> --interactive
 agentskill generate <repo> --profile concise
 agentskill generate <repo> --profile comprehensive
-agentskill generate <repo> --layout split --out AGENTS.md
-agentskill generate <repo> --layout multifile --out AGENTS.md
+agentskill generate <repo> --layout split
+agentskill generate <repo> --layout multifile
 agentskill generate <repo> --layout multifile --profile concise --out AGENTS.md
 
 # Update or create AGENTS.md in place
@@ -381,12 +381,15 @@ same section headings and section order are preserved regardless of profile.
   `AGENTS.reference.md` companion with comprehensive content. The primary file
   links to the companion. Split mode always uses concise for the primary and
   comprehensive for the companion regardless of the `--profile` flag; the
-  `--profile` flag only affects `single` and `multifile` layouts.
+  `--profile` flag only affects `single` and `multifile` layouts. If `--out` is
+  omitted, split writes into the target repo using `AGENTS.md` as the primary
+  path.
 - `--layout multifile` — writes a compact root index plus per-section markdown
   files in a `.agentskill/` directory beside the primary output. Each section file
   includes a backlink to the root. The `--profile` flag controls the density of
-  content in each section file. Multifile section filenames follow a stable
-  numbering scheme:
+  content in each section file. If `--out` is omitted, multifile writes into
+  the target repo using `AGENTS.md` as the root path. Multifile section filenames
+  follow a stable numbering scheme:
 
   ```text
   AGENTS.md
@@ -414,11 +417,14 @@ same section headings and section order are preserved regardless of profile.
 | `split`     | Ignored; primary is concise, companion is comprehensive | N/A  |
 | `multifile` | Content in each section file            | `comprehensive` |
 
-#### Required flags
+#### Default output paths
 
-- `--layout split` requires `--out` because it writes multiple files.
-- `--layout multifile` requires `--out` because it writes a directory tree.
-- `--layout single` works with or without `--out`.
+- `--layout single` without `--out` prints markdown to stdout.
+- `--layout split` without `--out` writes into the target repo: `<repo>/AGENTS.md`
+  and `<repo>/AGENTS.reference.md`.
+- `--layout multifile` without `--out` writes into the target repo:
+  `<repo>/AGENTS.md` and `<repo>/.agentskill/`.
+- All layouts accept `--out` to write to a custom location.
 
 #### Update constraints
 
@@ -431,10 +437,12 @@ with a clear error message. This constraint may be lifted in a future release.
 agentskill generate <repo>
 agentskill generate <repo> --profile comprehensive
 
-# Split generation
+# Split generation (writes into repo by default)
+agentskill generate <repo> --layout split
 agentskill generate <repo> --layout split --out AGENTS.md
 
-# Multifile generation
+# Multifile generation (writes into repo by default)
+agentskill generate <repo> --layout multifile
 agentskill generate <repo> --layout multifile --out AGENTS.md
 agentskill generate <repo> --layout multifile --profile concise --out AGENTS.md
 

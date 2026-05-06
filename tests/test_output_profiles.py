@@ -524,13 +524,28 @@ class TestSplitGeneration:
         assert primary_a == primary_b
 
 
-class TestSplitFailurePaths:
-    def test_split_without_out_fails(self, tmp_path, capsys):
+class TestSplitDefaultPath:
+    def test_split_without_out_writes_to_repo(self, tmp_path):
         repo = create_sample_repo(tmp_path)
         exit_code = main(["generate", str(repo), "--layout", "split"])
 
-        assert exit_code == 1
-        assert "--out" in capsys.readouterr().err
+        assert exit_code == 0
+        assert (repo / "AGENTS.md").exists()
+        assert (repo / "AGENTS.reference.md").exists()
+
+    def test_split_default_primary_contains_link(self, tmp_path):
+        repo = create_sample_repo(tmp_path)
+        main(["generate", str(repo), "--layout", "split"])
+
+        primary_text = (repo / "AGENTS.md").read_text()
+        assert "AGENTS.reference.md" in primary_text
+
+    def test_split_default_companion_has_reference_title(self, tmp_path):
+        repo = create_sample_repo(tmp_path)
+        main(["generate", str(repo), "--layout", "split"])
+
+        companion_text = (repo / "AGENTS.reference.md").read_text()
+        assert "# AGENTS Reference" in companion_text
 
     def test_update_layout_split_rejected(self, tmp_path, capsys):
         repo = create_sample_repo(tmp_path)
@@ -741,13 +756,31 @@ class TestMultifileGeneration:
         assert len(comp_red_lines) > len(concise_red_lines)
 
 
-class TestMultifileFailurePaths:
-    def test_multifile_without_out_fails(self, tmp_path, capsys):
+class TestMultifileDefaultPath:
+    def test_multifile_without_out_writes_to_repo(self, tmp_path):
         repo = create_sample_repo(tmp_path)
         exit_code = main(["generate", str(repo), "--layout", "multifile"])
 
-        assert exit_code == 1
-        assert "--out" in capsys.readouterr().err
+        assert exit_code == 0
+        assert (repo / "AGENTS.md").exists()
+        assert (repo / ".agentskill").is_dir()
+        assert (repo / ".agentskill" / "01_OVERVIEW.md").exists()
+        assert (repo / ".agentskill" / "15_RED_LINES.md").exists()
+
+    def test_multifile_default_root_contains_section_index(self, tmp_path):
+        repo = create_sample_repo(tmp_path)
+        main(["generate", str(repo), "--layout", "multifile"])
+
+        root_text = (repo / "AGENTS.md").read_text()
+        assert "# AGENTS.md" in root_text
+        assert "Section Index" in root_text
+
+    def test_multifile_default_section_has_backlink(self, tmp_path):
+        repo = create_sample_repo(tmp_path)
+        main(["generate", str(repo), "--layout", "multifile"])
+
+        overview_text = (repo / ".agentskill" / "01_OVERVIEW.md").read_text()
+        assert "AGENTS.md" in overview_text
 
     def test_update_layout_multifile_rejected(self, tmp_path, capsys):
         repo = create_sample_repo(tmp_path)

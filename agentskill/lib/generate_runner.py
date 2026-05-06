@@ -153,6 +153,14 @@ def generate_agents(
     return 0
 
 
+def _resolve_primary_path(out: str | None, repo_path: Path) -> Path:
+    """Return the primary output path, defaulting to repo-local AGENTS.md."""
+    if out is not None:
+        return validate_out_path(out)
+
+    return repo_path / "AGENTS.md"
+
+
 def _generate_split(
     repo_path: Path,
     *,
@@ -163,14 +171,7 @@ def _generate_split(
     profile: str = "concise",
 ) -> int:
     """Generate concise primary + comprehensive companion files."""
-    if out is None:
-        print(
-            "generate with layout 'split' requires --out because it writes multiple files",
-            file=sys.stderr,
-        )
-        return 1
-
-    primary_path = validate_out_path(out)
+    primary_path = _resolve_primary_path(out, repo_path)
 
     try:
         documents = load_reference_documents(references)
@@ -251,14 +252,7 @@ def _generate_multifile(
     profile: str = "comprehensive",
 ) -> int:
     """Generate root index + per-section markdown files."""
-    if out is None:
-        print(
-            "generate with layout 'multifile' requires --out because it writes multiple files",
-            file=sys.stderr,
-        )
-        return 1
-
-    primary_path = validate_out_path(out)
+    primary_path = _resolve_primary_path(out, repo_path)
 
     try:
         documents = load_reference_documents(references)
