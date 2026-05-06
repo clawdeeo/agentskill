@@ -15,7 +15,24 @@ completed items instead of turning this file into a changelog.
 
 ---
 
-## 1.4.0 — Watch and Validate
+## 1.4.0 — Output Profiles
+
+**Theme:** let users choose the right `AGENTS.md` density without sacrificing structure or synthesis quality.
+
+- Add output-length/profile selection for generated `AGENTS.md` files
+- Support concise mode for high-signal operational guidance
+- Support comprehensive mode for richer conventions, examples, and reference detail
+- Keep generation grounded in the same extracted repository facts across profiles
+- Preserve a stable core section structure across short and long outputs
+- Define clear boundaries for what belongs in concise vs comprehensive output
+- Prefer concise output as the default generation mode
+- Add optional split output mode for concise `AGENTS.md` plus linked extended reference doc
+- Ensure profile choice affects presentation density, not underlying analyzer conclusions
+- Keep user control explicit while maintaining opinionated information architecture
+
+---
+
+## 1.5.0 — Watch and Validate
 
 **Theme:** faster local feedback and safer regeneration loops.
 
@@ -28,7 +45,7 @@ completed items instead of turning this file into a changelog.
 
 ---
 
-## 1.5.0 — Landing Page
+## 1.6.0 — Landing Page
 
 **Theme:** present the project clearly to new users.
 
@@ -45,7 +62,7 @@ completed items instead of turning this file into a changelog.
 
 ---
 
-## 1.6.0 — Documentation Site
+## 1.7.0 — Documentation Site
 
 **Theme:** make the docs easier to explore and maintain.
 
@@ -64,7 +81,7 @@ completed items instead of turning this file into a changelog.
 
 ---
 
-## 1.7.0 — Export and Reporting
+## 1.8.0 — Export and Reporting
 
 **Theme:** make output easier to consume and share.
 
@@ -77,7 +94,7 @@ completed items instead of turning this file into a changelog.
 
 ---
 
-## 1.8.0 — Extensibility
+## 1.9.0 — Extensibility
 
 **Theme:** let advanced users adapt agentskill to their own environments.
 
@@ -90,7 +107,7 @@ completed items instead of turning this file into a changelog.
 
 ---
 
-## 1.9.0 — Smarter Synthesis
+## 1.10.0 — Smarter Synthesis
 
 **Theme:** improve the quality and usefulness of generated `AGENTS.md` output.
 
@@ -103,7 +120,7 @@ completed items instead of turning this file into a changelog.
 
 ---
 
-## 1.10.0 — AI Enhancement (opt-in)
+## 1.11.0 — AI Enhancement (opt-in)
 
 **Theme:** optional LLM-assisted synthesis improvements without changing the default offline model.
 
@@ -116,7 +133,7 @@ completed items instead of turning this file into a changelog.
 
 ---
 
-## 1.11.0 — Workspace and Scale
+## 1.12.0 — Workspace and Scale
 
 **Theme:** handle larger organizations and repository collections more cleanly.
 
@@ -129,7 +146,7 @@ completed items instead of turning this file into a changelog.
 
 ---
 
-## 1.12.0 — Team and Collaboration
+## 1.13.0 — Team and Collaboration
 
 **Theme:** support shared conventions and collaborative review workflows.
 
@@ -142,7 +159,7 @@ completed items instead of turning this file into a changelog.
 
 ---
 
-## 1.13.0 — Templates and Profiles
+## 1.14.0 — Templates and Profiles
 
 **Theme:** speed up adoption with reusable starting points.
 
@@ -155,7 +172,7 @@ completed items instead of turning this file into a changelog.
 
 ---
 
-## 1.14.0 — CI and Distribution
+## 1.15.0 — CI and Distribution
 
 **Theme:** make agentskill easier to adopt in automation and developer shells.
 
@@ -165,20 +182,3 @@ completed items instead of turning this file into a changelog.
 - Add unified JSON output across commands where practical
 - Improve automation-friendly distribution and integration surfaces
 - Strengthen CI adoption paths without introducing breaking CLI changes
-
----
-
-## 1.15.0 — Output Profiles
-
-**Theme:** let users choose the right `AGENTS.md` density without sacrificing structure or synthesis quality.
-
-- Add output-length/profile selection for generated `AGENTS.md` files
-- Support concise mode for high-signal operational guidance
-- Support comprehensive mode for richer conventions, examples, and reference detail
-- Keep generation grounded in the same extracted repository facts across profiles
-- Preserve a stable core section structure across short and long outputs
-- Define clear boundaries for what belongs in concise vs comprehensive output
-- Prefer concise output as the default generation mode
-- Add optional split output mode for concise `AGENTS.md` plus linked extended reference doc
-- Ensure profile choice affects presentation density, not underlying analyzer conclusions
-- Keep user control explicit while maintaining opinionated information architecture
