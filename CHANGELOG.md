@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-05-06
+
+### Added
+
+- Output profile support for `generate` and `update` commands
+- Split profile for AGENTS.md generation with companion document support
+- Multifile output layout support in AGENTS generation
+- Default output paths when `--out` is omitted for split and multifile layouts
+
+### Changed
+
+- Multifile output directory defaults to `.agentskill` for consistency
+- README enhanced with technical article link, stats section, and star history chart
+- ROADMAP.md updated with detailed release planning for versions 1.4.0 to 1.15.0
+
 ## [1.3.0] - 2026-05-02
 
 ### Added
