@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from test_support import create_sample_repo
 
 from agentskill.lib.output_profiles import (
@@ -5,7 +7,14 @@ from agentskill.lib.output_profiles import (
     SUPPORTED_OUTPUT_PROFILES,
     validate_output_profile,
 )
-from agentskill.lib.profile_rendering import RenderedSectionBody, combine_section_body
+from agentskill.lib.profile_rendering import (
+    RenderedSectionBody,
+    build_companion_document,
+    combine_section_body,
+    companion_path,
+    companion_relative_link,
+    inject_split_link,
+)
 from agentskill.main import main
 
 
@@ -76,13 +85,13 @@ class TestGenerateProfileDefaults:
         output = capsys.readouterr().out
         assert output.startswith("# AGENTS.md\n\n## 1. Overview\n")
 
-    def test_generate_split_is_accepted_but_not_implemented(self, tmp_path, capsys):
+    def test_generate_split_requires_out_flag(self, tmp_path, capsys):
         repo = create_sample_repo(tmp_path)
         exit_code = main(["generate", str(repo), "--profile", "split"])
 
         assert exit_code == 1
         err = capsys.readouterr().err
-        assert "split" in err and "not implemented yet" in err
+        assert "split" in err and "--out" in err
 
     def test_generate_invalid_profile_fails(self, tmp_path, capsys):
         repo = create_sample_repo(tmp_path)
@@ -326,3 +335,175 @@ class TestProfileFactConsistency:
         comp_text = (repo_b / "AGENTS.md").read_text()
 
         assert len(comp_text) > len(concise_text)
+
+
+class TestCompanionPath:
+    def test_companion_path_beside_agents_md(self):
+        primary = Path("AGENTS.md")
+        assert companion_path(primary) == Path("AGENTS.reference.md")
+
+    def test_companion_path_with_directory(self):
+        primary = Path("docs/AGENTS.md")
+        assert companion_path(primary) == Path("docs/AGENTS.reference.md")
+
+    def test_companion_path_custom_name(self):
+        primary = Path("output/MY_DOCS.md")
+        assert companion_path(primary) == Path("output/MY_DOCS.reference.md")
+
+    def test_companion_path_no_md_extension(self):
+        primary = Path("output/notes")
+        assert companion_path(primary) == Path("output/notes.reference.md")
+
+    def test_companion_relative_link(self):
+        primary = Path("AGENTS.md")
+        link = companion_relative_link(primary)
+        assert "AGENTS.reference.md" in link
+        assert "./" in link
+
+    def test_companion_relative_link_with_directory(self):
+        primary = Path("docs/AGENTS.md")
+        link = companion_relative_link(primary)
+        assert "AGENTS.reference.md" in link
+
+
+class TestInjectSplitLink:
+    def test_injects_link_after_title(self):
+        markdown = "# AGENTS.md\n\n## 1. Overview\nSome text.\n"
+        primary_path = Path("AGENTS.md")
+        result = inject_split_link(markdown, primary_path)
+        assert result.startswith("# AGENTS.md\n\n> Extended reference:")
+        assert "AGENTS.reference.md" in result
+        assert "## 1. Overview" in result
+
+    def test_injects_link_when_no_title(self):
+        markdown = "## 1. Overview\nSome text.\n"
+        primary_path = Path("AGENTS.md")
+        result = inject_split_link(markdown, primary_path)
+        assert result.startswith("> Extended reference:")
+        assert "AGENTS.reference.md" in result
+
+
+class TestBuildCompanionDocument:
+    def test_replaces_title(self):
+        markdown = "# AGENTS.md\n\n## 1. Overview\nSome text.\n"
+        result = build_companion_document(markdown)
+
+        assert result.startswith(
+            "> Extended reference document for the main AGENTS.md.\n\n# AGENTS Reference\n"
+        )
+
+        assert "## 1. Overview" in result
+        assert "# AGENTS.md" not in result
+
+    def test_preserves_content_without_title(self):
+        markdown = "## 1. Overview\nSome text.\n"
+        result = build_companion_document(markdown)
+        assert "## 1. Overview" in result
+
+
+class TestSplitGeneration:
+    def test_split_writes_primary_and_companion(self, tmp_path, monkeypatch):
+        repo = create_sample_repo(tmp_path / "repo")
+        monkeypatch.chdir(tmp_path)
+        out_file = Path("output/AGENTS.md")
+
+        exit_code = main(
+            ["generate", str(repo), "--profile", "split", "--out", str(out_file)]
+        )
+
+        assert exit_code == 0
+        primary = Path("output/AGENTS.md")
+        companion = Path("output/AGENTS.reference.md")
+        assert primary.exists()
+        assert companion.exists()
+
+    def test_primary_contains_link_to_companion(self, tmp_path, monkeypatch):
+        repo = create_sample_repo(tmp_path / "repo")
+        monkeypatch.chdir(tmp_path)
+        out_file = Path("output/AGENTS.md")
+
+        main(["generate", str(repo), "--profile", "split", "--out", str(out_file)])
+        primary_text = Path("output/AGENTS.md").read_text()
+        assert "AGENTS.reference.md" in primary_text
+
+    def test_primary_is_concise_content(self, tmp_path, monkeypatch):
+        repo = create_sample_repo(tmp_path / "repo")
+        monkeypatch.chdir(tmp_path)
+        out_file = Path("output/AGENTS.md")
+
+        main(["generate", str(repo), "--profile", "split", "--out", str(out_file)])
+        primary_text = Path("output/AGENTS.md").read_text()
+        assert "## 1. Overview" in primary_text
+
+    def test_companion_has_reference_title(self, tmp_path, monkeypatch):
+        repo = create_sample_repo(tmp_path / "repo")
+        monkeypatch.chdir(tmp_path)
+        out_file = Path("output/AGENTS.md")
+
+        main(["generate", str(repo), "--profile", "split", "--out", str(out_file)])
+        companion_text = Path("output/AGENTS.reference.md").read_text()
+        assert "# AGENTS Reference" in companion_text
+
+    def test_companion_is_longer_than_primary(self, tmp_path, monkeypatch):
+        repo = create_sample_repo(tmp_path / "repo")
+        monkeypatch.chdir(tmp_path)
+        out_file = Path("output/AGENTS.md")
+
+        main(["generate", str(repo), "--profile", "split", "--out", str(out_file)])
+        primary_text = Path("output/AGENTS.md").read_text()
+        companion_text = Path("output/AGENTS.reference.md").read_text()
+        assert len(companion_text) > len(primary_text)
+
+    def test_split_preserves_section_order_in_both(self, tmp_path, monkeypatch):
+        repo = create_sample_repo(tmp_path / "repo")
+        monkeypatch.chdir(tmp_path)
+        out_file = Path("output/AGENTS.md")
+
+        main(["generate", str(repo), "--profile", "split", "--out", str(out_file)])
+        primary_text = Path("output/AGENTS.md").read_text()
+        companion_text = Path("output/AGENTS.reference.md").read_text()
+
+        primary_headings = [
+            line
+            for line in primary_text.splitlines()
+            if line.startswith("## ") and not line.startswith("### ")
+        ]
+
+        companion_headings = [
+            line
+            for line in companion_text.splitlines()
+            if line.startswith("## ") and not line.startswith("### ")
+        ]
+
+        assert primary_headings == companion_headings
+
+    def test_split_deterministic_across_runs(self, tmp_path, monkeypatch):
+        repo = create_sample_repo(tmp_path / "repo")
+        monkeypatch.chdir(tmp_path)
+
+        out_a = Path("run_a/AGENTS.md")
+        main(["generate", str(repo), "--profile", "split", "--out", str(out_a)])
+        primary_a = Path("run_a/AGENTS.md").read_text()
+
+        out_b = Path("run_b/AGENTS.md")
+        main(["generate", str(repo), "--profile", "split", "--out", str(out_b)])
+        primary_b = Path("run_b/AGENTS.md").read_text()
+
+        assert primary_a == primary_b
+
+
+class TestSplitFailurePaths:
+    def test_split_without_out_fails(self, tmp_path, capsys):
+        repo = create_sample_repo(tmp_path)
+        exit_code = main(["generate", str(repo), "--profile", "split"])
+
+        assert exit_code == 1
+        assert "--out" in capsys.readouterr().err
+
+    def test_update_split_still_rejected(self, tmp_path, capsys):
+        repo = create_sample_repo(tmp_path)
+        exit_code = main(["update", str(repo), "--profile", "split"])
+
+        assert exit_code == 1
+        err = capsys.readouterr().err
+        assert "split" in err and "not implemented yet" in err

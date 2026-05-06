@@ -14,6 +14,11 @@ from agentskill.lib.interactive_runner import (
 )
 from agentskill.lib.output import validate_out_path
 from agentskill.lib.output_profiles import validate_output_profile
+from agentskill.lib.profile_rendering import (
+    build_companion_document,
+    companion_path,
+    inject_split_link,
+)
 from agentskill.lib.reference_flow import load_reference_documents
 from agentskill.lib.reference_initialization import (
     initialize_from_references,
@@ -50,11 +55,6 @@ def render_agents_markdown(
     profile: str = "concise",
 ) -> str:
     profile = validate_output_profile(profile)
-
-    if profile == "split":
-        raise NotImplementedError(
-            "generate with profile 'split' is not implemented yet"
-        )
 
     documents = load_reference_documents(references)
     analysis = run_all(str(repo))
@@ -94,8 +94,24 @@ def generate_agents(
     prompt_io: PromptIO | None = None,
     profile: str = "concise",
 ) -> int:
+    profile = validate_output_profile(profile)
+
     try:
         repo_path = validate_repo(repo)
+    except ValueError as exc:
+        print(f"Generate failed for repo {repo}: {exc}", file=sys.stderr)
+        return 1
+
+    if profile == "split":
+        return _generate_split(
+            repo_path,
+            out=out,
+            references=references,
+            interactive=interactive,
+            prompt_io=prompt_io,
+        )
+
+    try:
         markdown = render_agents_markdown(
             repo_path,
             references=references,
@@ -112,6 +128,93 @@ def generate_agents(
             print(markdown, end="")
     except Exception as exc:
         print(f"Generate failed for repo {repo}: {exc}", file=sys.stderr)
+        return 1
+
+    return 0
+
+
+def _generate_split(
+    repo_path: Path,
+    *,
+    out: str | None = None,
+    references: list[str] | None = None,
+    interactive: bool = False,
+    prompt_io: PromptIO | None = None,
+) -> int:
+    """Generate concise primary + comprehensive companion files."""
+    if out is None:
+        print(
+            "generate with profile 'split' requires --out because it writes multiple files",
+            file=sys.stderr,
+        )
+        return 1
+
+    primary_path = validate_out_path(out)
+
+    try:
+        documents = load_reference_documents(references)
+        analysis = run_all(str(repo_path))
+        feedback = load_feedback(repo_path)
+
+        concise_sections = render_agents_sections(
+            repo_path, analysis, feedback, profile="concise"
+        )
+
+        if interactive:
+            gaps = detect_generation_gaps(analysis, documents)
+            answers = ask_generation_questions(gaps, prompt_io or StdinPromptIO())
+            concise_sections = apply_interactive_notes(
+                concise_sections, interactive_section_notes(answers)
+            )
+
+        comprehensive_sections = render_agents_sections(
+            repo_path, analysis, feedback, profile="comprehensive"
+        )
+
+        if interactive:
+            comprehensive_sections = apply_interactive_notes(
+                comprehensive_sections, interactive_section_notes(answers)
+            )
+
+        concise_result = merge_agents_document(
+            None,
+            concise_sections,
+            force=True,
+            document_preamble=DOCUMENT_TITLE,
+            preferred_order=SECTION_ORDER,
+        )
+
+        comprehensive_result = merge_agents_document(
+            None,
+            comprehensive_sections,
+            force=True,
+            document_preamble=DOCUMENT_TITLE,
+            preferred_order=SECTION_ORDER,
+        )
+
+        primary_markdown = inject_split_link(concise_result.text, primary_path)
+        companion_markdown = build_companion_document(comprehensive_result.text)
+
+        if references:
+            initialization = initialize_from_references(analysis, documents)
+            metadata_block = render_reference_metadata_block(initialization.metadata)
+
+            primary_markdown = _inject_reference_metadata(
+                primary_markdown, metadata_block
+            )
+
+            companion_markdown = _inject_reference_metadata(
+                companion_markdown, metadata_block
+            )
+
+        comp_path = companion_path(primary_path)
+
+        primary_path.parent.mkdir(parents=True, exist_ok=True)
+        primary_path.write_text(primary_markdown)
+        comp_path.parent.mkdir(parents=True, exist_ok=True)
+        comp_path.write_text(companion_markdown)
+    except Exception as exc:
+        print(f"Generate failed for repo {repo_path}: {exc}", file=sys.stderr)
         return 1
 
     return 0

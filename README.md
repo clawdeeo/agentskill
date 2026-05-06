@@ -246,7 +246,9 @@ agentskill generate <repo>
 agentskill generate <repo> --out AGENTS.md
 agentskill generate <repo> --reference ../ref-a --reference ../ref-b
 agentskill generate <repo> --interactive
+agentskill generate <repo> --profile concise
 agentskill generate <repo> --profile comprehensive
+agentskill generate <repo> --profile split --out AGENTS.md
 
 # Update or create AGENTS.md in place
 agentskill update <repo>
@@ -334,14 +336,18 @@ section order, section headings, or the underlying analyzer facts.
 - `--profile comprehensive` — includes everything from concise plus
   representative snippets, annotation counts, expanded explanatory bullets,
   and richer provenance from analyzer results.
-- `--profile split` — accepted by the CLI contract but not yet implemented;
-  produces a clear "not implemented yet" error at the rendering stage.
+- `--profile split` — writes two files from a single analysis pass: a concise
+  primary `AGENTS.md` and an extended `AGENTS.reference.md` companion with
+  comprehensive-style content. The primary file links to the companion.
+  Split mode requires `--out` because it writes multiple files; it is only
+  supported for `generate`, not `update`.
 
-Both profiles produce deterministic output from the same analyzer results.
+All profiles produce deterministic output from the same analyzer results.
 
 ```bash
 agentskill generate <repo> --profile concise
 agentskill generate <repo> --profile comprehensive
+agentskill generate <repo> --profile split --out AGENTS.md
 agentskill update <repo> --profile comprehensive
 ```
 
