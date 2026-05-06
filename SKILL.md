@@ -223,7 +223,7 @@ if the user has already specified both preferences.
 | ----------- | ------------------------------------------------------------------------- |
 | `single`    | One complete markdown file (default)                                      |
 | `split`     | Concise primary file plus comprehensive companion reference doc           |
-| `multifile` | Root index file plus one markdown file per section in an `agents/` dir   |
+| `multifile` | Root index file plus one markdown file per section in a `.agentskill/` dir |
 
 **Asking the user:**
 
@@ -325,7 +325,7 @@ Write the output according to the layout chosen in Step 9.
 
 **Layout: `multifile`** — Write a root index plus per-section files:
 - `AGENTS.md` — root index with section links
-- `agents/01_OVERVIEW.md`, `agents/02_REPOSITORY_STRUCTURE.md`, ... — one file per section, each with a backlink to the root
+- `.agentskill/01_OVERVIEW.md`, `.agentskill/02_REPOSITORY_STRUCTURE.md`, ... — one file per section, each with a backlink to the root
 
 **If this is a new file:** Write directly.
 

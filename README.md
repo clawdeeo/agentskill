@@ -383,14 +383,14 @@ same section headings and section order are preserved regardless of profile.
   comprehensive for the companion regardless of the `--profile` flag; the
   `--profile` flag only affects `single` and `multifile` layouts.
 - `--layout multifile` — writes a compact root index plus per-section markdown
-  files in an `agents/` directory beside the primary output. Each section file
+  files in a `.agentskill/` directory beside the primary output. Each section file
   includes a backlink to the root. The `--profile` flag controls the density of
   content in each section file. Multifile section filenames follow a stable
   numbering scheme:
 
   ```text
   AGENTS.md
-  agents/
+  .agentskill/
     01_OVERVIEW.md
     02_REPOSITORY_STRUCTURE.md
     05_COMMANDS_AND_WORKFLOWS.md

@@ -560,9 +560,9 @@ class TestMultifileGeneration:
 
         assert exit_code == 0
         assert Path("output/AGENTS.md").exists()
-        assert Path("output/agents").is_dir()
-        assert Path("output/agents/01_OVERVIEW.md").exists()
-        assert Path("output/agents/15_RED_LINES.md").exists()
+        assert Path("output/.agentskill").is_dir()
+        assert Path("output/.agentskill/01_OVERVIEW.md").exists()
+        assert Path("output/.agentskill/15_RED_LINES.md").exists()
 
     def test_root_contains_section_index(self, tmp_path, monkeypatch):
         repo = create_sample_repo(tmp_path / "repo")
@@ -583,8 +583,8 @@ class TestMultifileGeneration:
         root_text = Path("output/AGENTS.md").read_text()
         assert "# AGENTS.md" in root_text
         assert "Section Index" in root_text
-        assert "agents/01_OVERVIEW.md" in root_text
-        assert "agents/15_RED_LINES.md" in root_text
+        assert ".agentskill/01_OVERVIEW.md" in root_text
+        assert ".agentskill/15_RED_LINES.md" in root_text
 
     def test_root_does_not_contain_full_section_content(self, tmp_path, monkeypatch):
         repo = create_sample_repo(tmp_path / "repo")
@@ -621,7 +621,7 @@ class TestMultifileGeneration:
             ]
         )
 
-        overview_text = Path("output/agents/01_OVERVIEW.md").read_text()
+        overview_text = Path("output/.agentskill/01_OVERVIEW.md").read_text()
         assert "# 1. Overview" in overview_text
 
     def test_section_files_contain_backlinks(self, tmp_path, monkeypatch):
@@ -640,7 +640,7 @@ class TestMultifileGeneration:
             ]
         )
 
-        overview_text = Path("output/agents/01_OVERVIEW.md").read_text()
+        overview_text = Path("output/.agentskill/01_OVERVIEW.md").read_text()
         assert "AGENTS.md" in overview_text
 
     def test_section_files_have_correct_names(self, tmp_path, monkeypatch):
@@ -667,7 +667,7 @@ class TestMultifileGeneration:
             "15_RED_LINES.md",
         ]
 
-        agents_dir = Path("output/agents")
+        agents_dir = Path("output/.agentskill")
         for filename in expected_files:
             assert (agents_dir / filename).exists(), f"Missing section file: {filename}"
 
@@ -736,8 +736,8 @@ class TestMultifileGeneration:
             ]
         )
 
-        concise_red_lines = Path("concise/agents/15_RED_LINES.md").read_text()
-        comp_red_lines = Path("comp/agents/15_RED_LINES.md").read_text()
+        concise_red_lines = Path("concise/.agentskill/15_RED_LINES.md").read_text()
+        comp_red_lines = Path("comp/.agentskill/15_RED_LINES.md").read_text()
         assert len(comp_red_lines) > len(concise_red_lines)
 
 

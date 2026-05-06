@@ -48,7 +48,7 @@ generation, and update workflows.
 - `--layout` is supported by `generate`. Accepted values are `single` (default), `split`, and `multifile`.
   - `single` writes one complete markdown file.
   - `split` writes two files: a concise primary document and an `AGENTS.reference.md` companion with comprehensive content. The primary file contains a relative link to the companion. Split mode requires `--out` because it writes multiple files.
-  - `multifile` writes a root index file plus per-section markdown files in an `agents/` directory beside the primary output. Section filenames follow a stable numbering scheme: `01_OVERVIEW.md`, `02_REPOSITORY_STRUCTURE.md`, `05_COMMANDS_AND_WORKFLOWS.md`, `06_CODE_FORMATTING.md`, `07_NAMING_CONVENTIONS.md`, `08_TYPE_ANNOTATIONS.md`, `09_IMPORTS.md`, `10_ERROR_HANDLING.md`, `11_COMMENTS_AND_DOCSTRINGS.md`, `12_TESTING.md`, `13_GIT.md`, `14_DEPENDENCIES_AND_TOOLING.md`, `15_RED_LINES.md`. Each section file contains a backlink to the root. Multifile mode requires `--out`.
+  - `multifile` writes a root index file plus per-section markdown files in a `.agentskill/` directory beside the primary output. Section filenames follow a stable numbering scheme: `01_OVERVIEW.md`, `02_REPOSITORY_STRUCTURE.md`, `05_COMMANDS_AND_WORKFLOWS.md`, `06_CODE_FORMATTING.md`, `07_NAMING_CONVENTIONS.md`, `08_TYPE_ANNOTATIONS.md`, `09_IMPORTS.md`, `10_ERROR_HANDLING.md`, `11_COMMENTS_AND_DOCSTRINGS.md`, `12_TESTING.md`, `13_GIT.md`, `14_DEPENDENCIES_AND_TOOLING.md`, `15_RED_LINES.md`. Each section file contains a backlink to the root. Multifile mode requires `--out`.
   - `update --layout` is not yet supported for `split` or `multifile` and is explicitly rejected.
 - `--section`, `--exclude-section`, and `--force` are supported by `update`.
 

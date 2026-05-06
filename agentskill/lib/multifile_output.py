@@ -40,7 +40,7 @@ SECTION_DESCRIPTIONS: dict[str, str] = {
     "red lines": "non-negotiable constraints and hard boundaries",
 }
 
-SECTION_DIR = "agents"
+SECTION_DIR = ".agentskill"
 BACKLINK_TEXT = "> Back to [`AGENTS.md`](../AGENTS.md)\n\n"
 
 

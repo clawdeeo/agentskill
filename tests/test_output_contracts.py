@@ -348,7 +348,7 @@ class TestPackagingDifferences:
             ]
         )
 
-        red_lines = Path("mf/agents/15_RED_LINES.md").read_text()
+        red_lines = Path("mf/.agentskill/15_RED_LINES.md").read_text()
         assert "Do not" in red_lines
 
     def test_multifile_deterministic_file_tree(self, tmp_path, monkeypatch):
@@ -378,8 +378,8 @@ class TestPackagingDifferences:
             ]
         )
 
-        run1_files = sorted(p.name for p in Path("run1/agents").iterdir())
-        run2_files = sorted(p.name for p in Path("run2/agents").iterdir())
+        run1_files = sorted(p.name for p in Path("run1/.agentskill").iterdir())
+        run2_files = sorted(p.name for p in Path("run2/.agentskill").iterdir())
 
         assert run1_files == run2_files
 
@@ -400,8 +400,8 @@ class TestPackagingDifferences:
 
         root = Path("mf/AGENTS.md").read_text()
 
-        assert "agents/01_OVERVIEW.md" in root
-        assert "agents/15_RED_LINES.md" in root
+        assert ".agentskill/01_OVERVIEW.md" in root
+        assert ".agentskill/15_RED_LINES.md" in root
 
     def test_multifile_section_files_have_backlinks(self, tmp_path, monkeypatch):
         repo = create_sample_repo(tmp_path / "repo")
@@ -418,7 +418,7 @@ class TestPackagingDifferences:
             ]
         )
 
-        for section_file in Path("mf/agents").iterdir():
+        for section_file in Path("mf/.agentskill").iterdir():
             content = section_file.read_text()
             assert "../AGENTS.md" in content or "AGENTS.md" in content
 
@@ -495,8 +495,8 @@ class TestProfileLayoutInteraction:
             ]
         )
 
-        concise_red_lines = Path("concise_mf/agents/15_RED_LINES.md").read_text()
-        comp_red_lines = Path("comp_mf/agents/15_RED_LINES.md").read_text()
+        concise_red_lines = Path("concise_mf/.agentskill/15_RED_LINES.md").read_text()
+        comp_red_lines = Path("comp_mf/.agentskill/15_RED_LINES.md").read_text()
 
         assert len(comp_red_lines) > len(concise_red_lines)
 
@@ -531,8 +531,8 @@ class TestProfileLayoutInteraction:
             ]
         )
 
-        default_red_lines = Path("default_mf/agents/15_RED_LINES.md").read_text()
-        comp_red_lines = Path("comp_mf/agents/15_RED_LINES.md").read_text()
+        default_red_lines = Path("default_mf/.agentskill/15_RED_LINES.md").read_text()
+        comp_red_lines = Path("comp_mf/.agentskill/15_RED_LINES.md").read_text()
 
         for heading in ["# 15. Red Lines", "Do not"]:
             assert heading in default_red_lines
@@ -658,7 +658,7 @@ class TestReferenceCompatibility:
 
         assert exit_code == 0
         assert Path("mf/AGENTS.md").exists()
-        assert Path("mf/agents").is_dir()
+        assert Path("mf/.agentskill").is_dir()
 
     def test_split_with_references_includes_metadata(self, tmp_path, monkeypatch):
         repo = create_sample_repo(tmp_path / "target")
@@ -787,9 +787,9 @@ class TestDeterminism:
         root_b = Path("b/AGENTS.md").read_text()
         assert root_a == root_b
 
-        for section_file in Path("a/agents").iterdir():
+        for section_file in Path("a/.agentskill").iterdir():
             a_content = section_file.read_text()
-            b_content = (Path("b/agents") / section_file.name).read_text()
+            b_content = (Path("b/.agentskill") / section_file.name).read_text()
             assert a_content == b_content
 
     def test_single_deterministic_across_runs(self, tmp_path, capsys):

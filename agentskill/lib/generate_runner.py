@@ -13,6 +13,7 @@ from agentskill.lib.interactive_runner import (
     interactive_section_notes,
 )
 from agentskill.lib.multifile_output import (
+    SECTION_DIR,
     build_root_index,
     build_section_file,
     section_file_path,
@@ -303,7 +304,7 @@ def _generate_multifile(
         primary_path.parent.mkdir(parents=True, exist_ok=True)
         primary_path.write_text(root_markdown)
 
-        section_dir = primary_path.parent / "agents"
+        section_dir = primary_path.parent / SECTION_DIR
         section_dir.mkdir(parents=True, exist_ok=True)
 
         for name in active_sections:
