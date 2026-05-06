@@ -39,11 +39,15 @@ generation, and update workflows.
 - `--out` writes JSON or markdown to a file instead of stdout.
 - `--reference` is supported by `analyze` and `generate`.
 - `--interactive` is supported by `generate` only.
-- `--profile` is supported by `generate` and `update`. Accepted values are `concise` (default), `comprehensive`, and `split`.
+- `--profile` is supported by `generate` and `update`. Accepted values are `concise` (default) and `comprehensive`.
   - `concise` emits operational rules and key facts only; representative code snippets and secondary explanatory bullets are suppressed.
   - `comprehensive` includes everything from concise plus representative snippets, annotation measurements, and expanded rationale bullets.
-  - `split` produces two files from a single analysis pass: a concise primary document and an `AGENTS.reference.md` companion with comprehensive-style content. The primary file contains a relative link to the companion. Split mode requires `--out` because it writes multiple files. Split is only supported for `generate`; `update --profile split` is explicitly rejected.
   - All profiles are deterministic from the same analyzer results and preserve the same section order and headings.
+- `--layout` is supported by `generate`. Accepted values are `single` (default), `split`, and `multifile`.
+  - `single` writes one complete markdown file.
+  - `split` writes two files from a single analysis pass: a concise primary document and an `AGENTS.reference.md` companion with comprehensive-style content. The primary file contains a relative link to the companion. Split mode requires `--out` because it writes multiple files.
+  - `multifile` writes a root index file plus per-section markdown files in an `agents/` directory beside the primary output. Each section file contains a backlink to the root. Multifile mode requires `--out`.
+  - `update --layout` is not yet supported for `split` or `multifile` and is explicitly rejected.
 - `--section`, `--exclude-section`, and `--force` are supported by `update`.
 
 Release-grade CLI contract tests live in `tests/test_cli_contract.py`.

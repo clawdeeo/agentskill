@@ -17,6 +17,7 @@ from agentskill.lib.agents_document import (
     normalize_section_name,
 )
 from agentskill.lib.output import validate_out_path
+from agentskill.lib.output_layouts import validate_output_layout
 from agentskill.lib.output_profiles import validate_output_profile
 from agentskill.lib.profile_rendering import RenderedSectionBody, combine_section_body
 from agentskill.lib.runner import run_all
@@ -1129,14 +1130,21 @@ def update_agents(
     force: bool = False,
     out: str | None = None,
     profile: str = "concise",
+    layout: str = "single",
 ) -> int:
     """Update or create AGENTS.md for a repository."""
     try:
         profile = validate_output_profile(profile)
+        layout = validate_output_layout(layout)
 
-        if profile == "split":
+        if layout == "split":
             raise NotImplementedError(
-                "update with profile 'split' is not implemented yet"
+                "update with layout 'split' is not implemented yet"
+            )
+
+        if layout == "multifile":
+            raise NotImplementedError(
+                "update with layout 'multifile' is not implemented yet"
             )
 
         repo_path = validate_repo(repo)

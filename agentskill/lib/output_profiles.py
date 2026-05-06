@@ -1,6 +1,6 @@
 """Shared output profile contract for generate and update flows."""
 
-SUPPORTED_OUTPUT_PROFILES = ("concise", "comprehensive", "split")
+SUPPORTED_OUTPUT_PROFILES = ("concise", "comprehensive")
 DEFAULT_OUTPUT_PROFILE = "concise"
 
 

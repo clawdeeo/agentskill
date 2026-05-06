@@ -66,6 +66,9 @@ agentskill analyze <repo> --pretty
 agentskill generate <repo>
 agentskill generate <repo> --out AGENTS.md
 agentskill generate <repo> --interactive
+agentskill generate <repo> --profile comprehensive
+agentskill generate <repo> --layout split --out AGENTS.md
+agentskill generate <repo> --layout multifile --out AGENTS.md
 agentskill update <repo>
 agentskill update <repo> --section testing
 agentskill update <repo> --force

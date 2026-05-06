@@ -12,7 +12,13 @@ from agentskill.lib.interactive_runner import (
     detect_generation_gaps,
     interactive_section_notes,
 )
+from agentskill.lib.multifile_output import (
+    build_root_index,
+    build_section_file,
+    section_file_path,
+)
 from agentskill.lib.output import validate_out_path
+from agentskill.lib.output_layouts import validate_output_layout
 from agentskill.lib.output_profiles import validate_output_profile
 from agentskill.lib.profile_rendering import (
     build_companion_document,
@@ -93,8 +99,10 @@ def generate_agents(
     interactive: bool = False,
     prompt_io: PromptIO | None = None,
     profile: str = "concise",
+    layout: str = "single",
 ) -> int:
     profile = validate_output_profile(profile)
+    layout = validate_output_layout(layout)
 
     try:
         repo_path = validate_repo(repo)
@@ -102,13 +110,24 @@ def generate_agents(
         print(f"Generate failed for repo {repo}: {exc}", file=sys.stderr)
         return 1
 
-    if profile == "split":
+    if layout == "split":
         return _generate_split(
             repo_path,
             out=out,
             references=references,
             interactive=interactive,
             prompt_io=prompt_io,
+            profile=profile,
+        )
+
+    if layout == "multifile":
+        return _generate_multifile(
+            repo_path,
+            out=out,
+            references=references,
+            interactive=interactive,
+            prompt_io=prompt_io,
+            profile=profile,
         )
 
     try:
@@ -140,11 +159,12 @@ def _generate_split(
     references: list[str] | None = None,
     interactive: bool = False,
     prompt_io: PromptIO | None = None,
+    profile: str = "concise",
 ) -> int:
     """Generate concise primary + comprehensive companion files."""
     if out is None:
         print(
-            "generate with profile 'split' requires --out because it writes multiple files",
+            "generate with layout 'split' requires --out because it writes multiple files",
             file=sys.stderr,
         )
         return 1
@@ -213,6 +233,85 @@ def _generate_split(
         primary_path.write_text(primary_markdown)
         comp_path.parent.mkdir(parents=True, exist_ok=True)
         comp_path.write_text(companion_markdown)
+    except Exception as exc:
+        print(f"Generate failed for repo {repo_path}: {exc}", file=sys.stderr)
+        return 1
+
+    return 0
+
+
+def _generate_multifile(
+    repo_path: Path,
+    *,
+    out: str | None = None,
+    references: list[str] | None = None,
+    interactive: bool = False,
+    prompt_io: PromptIO | None = None,
+    profile: str = "comprehensive",
+) -> int:
+    """Generate root index + per-section markdown files."""
+    if out is None:
+        print(
+            "generate with layout 'multifile' requires --out because it writes multiple files",
+            file=sys.stderr,
+        )
+        return 1
+
+    primary_path = validate_out_path(out)
+
+    try:
+        documents = load_reference_documents(references)
+        analysis = run_all(str(repo_path))
+        feedback = load_feedback(repo_path)
+
+        sections = render_agents_sections(
+            repo_path, analysis, feedback, profile=profile
+        )
+
+        if interactive:
+            gaps = detect_generation_gaps(analysis, documents)
+            answers = ask_generation_questions(gaps, prompt_io or StdinPromptIO())
+            sections = apply_interactive_notes(
+                sections, interactive_section_notes(answers)
+            )
+
+        overview_body = sections.get("overview")
+        overview_summary = ""
+
+        if overview_body is not None:
+            overview_text = overview_body.body.strip()
+            lines = [
+                line for line in overview_text.splitlines() if not line.startswith("#")
+            ]
+
+            if lines:
+                overview_summary = " ".join(
+                    line.strip() for line in lines if line.strip()
+                )
+
+        active_sections = [name for name in SECTION_ORDER if name in sections]
+
+        root_markdown = build_root_index(
+            primary_path, active_sections, overview_summary=overview_summary
+        )
+
+        if references:
+            initialization = initialize_from_references(analysis, documents)
+            metadata_block = render_reference_metadata_block(initialization.metadata)
+            root_markdown = _inject_reference_metadata(root_markdown, metadata_block)
+
+        primary_path.parent.mkdir(parents=True, exist_ok=True)
+        primary_path.write_text(root_markdown)
+
+        section_dir = primary_path.parent / "agents"
+        section_dir.mkdir(parents=True, exist_ok=True)
+
+        for name in active_sections:
+            section = sections[name]
+            file_path = section_file_path(primary_path, name)
+            file_content = build_section_file(name, section.body)
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            file_path.write_text(file_content)
     except Exception as exc:
         print(f"Generate failed for repo {repo_path}: {exc}", file=sys.stderr)
         return 1

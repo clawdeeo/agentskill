@@ -248,7 +248,8 @@ agentskill generate <repo> --reference ../ref-a --reference ../ref-b
 agentskill generate <repo> --interactive
 agentskill generate <repo> --profile concise
 agentskill generate <repo> --profile comprehensive
-agentskill generate <repo> --profile split --out AGENTS.md
+agentskill generate <repo> --layout split --out AGENTS.md
+agentskill generate <repo> --layout multifile --out AGENTS.md
 
 # Update or create AGENTS.md in place
 agentskill update <repo>
@@ -336,18 +337,32 @@ section order, section headings, or the underlying analyzer facts.
 - `--profile comprehensive` — includes everything from concise plus
   representative snippets, annotation counts, expanded explanatory bullets,
   and richer provenance from analyzer results.
-- `--profile split` — writes two files from a single analysis pass: a concise
-  primary `AGENTS.md` and an extended `AGENTS.reference.md` companion with
-  comprehensive-style content. The primary file links to the companion.
-  Split mode requires `--out` because it writes multiple files; it is only
-  supported for `generate`, not `update`.
 
 All profiles produce deterministic output from the same analyzer results.
+
+### Output Layouts
+
+`generate` accepts `--layout` to control output packaging. The layout
+determines how the generated markdown is split across files without changing
+the section content or profile density.
+
+- `--layout single` (default) — writes one complete markdown file.
+- `--layout split` — writes two files from a single analysis pass: a concise
+  primary `AGENTS.md` and an extended `AGENTS.reference.md` companion with
+  comprehensive-style content. The primary file links to the companion.
+  Split mode requires `--out` because it writes multiple files.
+- `--layout multifile` — writes a compact root index plus per-section
+  markdown files in an `agents/` directory beside the primary output. Each
+  section file includes a backlink to the root. Multifile mode requires
+  `--out`.
+
+`update --layout` is not yet supported for `split` or `multifile`.
 
 ```bash
 agentskill generate <repo> --profile concise
 agentskill generate <repo> --profile comprehensive
-agentskill generate <repo> --profile split --out AGENTS.md
+agentskill generate <repo> --layout split --out AGENTS.md
+agentskill generate <repo> --layout multifile --out AGENTS.md
 agentskill update <repo> --profile comprehensive
 ```
 

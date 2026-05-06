@@ -2,6 +2,11 @@ from pathlib import Path
 
 from test_support import create_sample_repo
 
+from agentskill.lib.output_layouts import (
+    DEFAULT_OUTPUT_LAYOUT,
+    SUPPORTED_OUTPUT_LAYOUTS,
+    validate_output_layout,
+)
 from agentskill.lib.output_profiles import (
     DEFAULT_OUTPUT_PROFILE,
     SUPPORTED_OUTPUT_PROFILES,
@@ -25,25 +30,22 @@ class TestValidateOutputProfile:
     def test_comprehensive_is_valid(self):
         assert validate_output_profile("comprehensive") == "comprehensive"
 
-    def test_split_is_valid(self):
-        assert validate_output_profile("split") == "split"
-
     def test_default_is_concise(self):
         assert DEFAULT_OUTPUT_PROFILE == "concise"
 
-    def test_supported_profiles_include_all_three(self):
-        assert set(SUPPORTED_OUTPUT_PROFILES) == {"concise", "comprehensive", "split"}
+    def test_supported_profiles_are_concise_and_comprehensive(self):
+        assert set(SUPPORTED_OUTPUT_PROFILES) == {"concise", "comprehensive"}
 
-    def test_invalid_profile_raises_value_error(self):
+    def test_split_is_not_a_profile(self):
         try:
-            validate_output_profile("verbose")
+            validate_output_profile("split")
             raise AssertionError("should have raised ValueError")
         except ValueError as exc:
             assert "unsupported output profile" in str(exc)
 
-    def test_empty_profile_raises_value_error(self):
+    def test_invalid_profile_raises_value_error(self):
         try:
-            validate_output_profile("")
+            validate_output_profile("verbose")
             raise AssertionError("should have raised ValueError")
         except ValueError as exc:
             assert "unsupported output profile" in str(exc)
@@ -54,12 +56,35 @@ class TestValidateOutputProfile:
     def test_normalizes_whitespace(self):
         assert validate_output_profile("  concise  ") == "concise"
 
-    def test_error_message_lists_allowed_values(self):
+
+class TestValidateOutputLayout:
+    def test_single_is_valid(self):
+        assert validate_output_layout("single") == "single"
+
+    def test_split_is_valid(self):
+        assert validate_output_layout("split") == "split"
+
+    def test_multifile_is_valid(self):
+        assert validate_output_layout("multifile") == "multifile"
+
+    def test_default_is_single(self):
+        assert DEFAULT_OUTPUT_LAYOUT == "single"
+
+    def test_supported_layouts_include_all_three(self):
+        assert set(SUPPORTED_OUTPUT_LAYOUTS) == {"single", "split", "multifile"}
+
+    def test_invalid_layout_raises_value_error(self):
         try:
-            validate_output_profile("detailed")
+            validate_output_layout("flat")
             raise AssertionError("should have raised ValueError")
         except ValueError as exc:
-            assert "concise, comprehensive, split" in str(exc)
+            assert "unsupported output layout" in str(exc)
+
+    def test_normalizes_uppercase(self):
+        assert validate_output_layout("Single") == "single"
+
+    def test_normalizes_whitespace(self):
+        assert validate_output_layout("  multifile  ") == "multifile"
 
 
 class TestGenerateProfileDefaults:
@@ -85,13 +110,12 @@ class TestGenerateProfileDefaults:
         output = capsys.readouterr().out
         assert output.startswith("# AGENTS.md\n\n## 1. Overview\n")
 
-    def test_generate_split_requires_out_flag(self, tmp_path, capsys):
+    def test_generate_profile_split_is_invalid(self, tmp_path, capsys):
         repo = create_sample_repo(tmp_path)
         exit_code = main(["generate", str(repo), "--profile", "split"])
 
         assert exit_code == 1
-        err = capsys.readouterr().err
-        assert "split" in err and "--out" in err
+        assert "unsupported output profile" in capsys.readouterr().err
 
     def test_generate_invalid_profile_fails(self, tmp_path, capsys):
         repo = create_sample_repo(tmp_path)
@@ -136,13 +160,21 @@ class TestUpdateProfileDefaults:
         assert exit_code == 0
         assert (repo / "AGENTS.md").exists()
 
-    def test_update_split_is_accepted_but_not_implemented(self, tmp_path, capsys):
+    def test_update_layout_split_not_implemented(self, tmp_path, capsys):
         repo = create_sample_repo(tmp_path)
-        exit_code = main(["update", str(repo), "--profile", "split"])
+        exit_code = main(["update", str(repo), "--layout", "split"])
 
         assert exit_code == 1
         err = capsys.readouterr().err
         assert "split" in err and "not implemented yet" in err
+
+    def test_update_layout_multifile_not_implemented(self, tmp_path, capsys):
+        repo = create_sample_repo(tmp_path)
+        exit_code = main(["update", str(repo), "--layout", "multifile"])
+
+        assert exit_code == 1
+        err = capsys.readouterr().err
+        assert "multifile" in err and "not implemented yet" in err
 
     def test_update_invalid_profile_fails(self, tmp_path, capsys):
         repo = create_sample_repo(tmp_path)
@@ -408,7 +440,7 @@ class TestSplitGeneration:
         out_file = Path("output/AGENTS.md")
 
         exit_code = main(
-            ["generate", str(repo), "--profile", "split", "--out", str(out_file)]
+            ["generate", str(repo), "--layout", "split", "--out", str(out_file)]
         )
 
         assert exit_code == 0
@@ -422,7 +454,7 @@ class TestSplitGeneration:
         monkeypatch.chdir(tmp_path)
         out_file = Path("output/AGENTS.md")
 
-        main(["generate", str(repo), "--profile", "split", "--out", str(out_file)])
+        main(["generate", str(repo), "--layout", "split", "--out", str(out_file)])
         primary_text = Path("output/AGENTS.md").read_text()
         assert "AGENTS.reference.md" in primary_text
 
@@ -431,7 +463,7 @@ class TestSplitGeneration:
         monkeypatch.chdir(tmp_path)
         out_file = Path("output/AGENTS.md")
 
-        main(["generate", str(repo), "--profile", "split", "--out", str(out_file)])
+        main(["generate", str(repo), "--layout", "split", "--out", str(out_file)])
         primary_text = Path("output/AGENTS.md").read_text()
         assert "## 1. Overview" in primary_text
 
@@ -440,7 +472,7 @@ class TestSplitGeneration:
         monkeypatch.chdir(tmp_path)
         out_file = Path("output/AGENTS.md")
 
-        main(["generate", str(repo), "--profile", "split", "--out", str(out_file)])
+        main(["generate", str(repo), "--layout", "split", "--out", str(out_file)])
         companion_text = Path("output/AGENTS.reference.md").read_text()
         assert "# AGENTS Reference" in companion_text
 
@@ -449,7 +481,7 @@ class TestSplitGeneration:
         monkeypatch.chdir(tmp_path)
         out_file = Path("output/AGENTS.md")
 
-        main(["generate", str(repo), "--profile", "split", "--out", str(out_file)])
+        main(["generate", str(repo), "--layout", "split", "--out", str(out_file)])
         primary_text = Path("output/AGENTS.md").read_text()
         companion_text = Path("output/AGENTS.reference.md").read_text()
         assert len(companion_text) > len(primary_text)
@@ -459,7 +491,7 @@ class TestSplitGeneration:
         monkeypatch.chdir(tmp_path)
         out_file = Path("output/AGENTS.md")
 
-        main(["generate", str(repo), "--profile", "split", "--out", str(out_file)])
+        main(["generate", str(repo), "--layout", "split", "--out", str(out_file)])
         primary_text = Path("output/AGENTS.md").read_text()
         companion_text = Path("output/AGENTS.reference.md").read_text()
 
@@ -482,11 +514,11 @@ class TestSplitGeneration:
         monkeypatch.chdir(tmp_path)
 
         out_a = Path("run_a/AGENTS.md")
-        main(["generate", str(repo), "--profile", "split", "--out", str(out_a)])
+        main(["generate", str(repo), "--layout", "split", "--out", str(out_a)])
         primary_a = Path("run_a/AGENTS.md").read_text()
 
         out_b = Path("run_b/AGENTS.md")
-        main(["generate", str(repo), "--profile", "split", "--out", str(out_b)])
+        main(["generate", str(repo), "--layout", "split", "--out", str(out_b)])
         primary_b = Path("run_b/AGENTS.md").read_text()
 
         assert primary_a == primary_b
@@ -495,15 +527,232 @@ class TestSplitGeneration:
 class TestSplitFailurePaths:
     def test_split_without_out_fails(self, tmp_path, capsys):
         repo = create_sample_repo(tmp_path)
-        exit_code = main(["generate", str(repo), "--profile", "split"])
+        exit_code = main(["generate", str(repo), "--layout", "split"])
 
         assert exit_code == 1
         assert "--out" in capsys.readouterr().err
 
-    def test_update_split_still_rejected(self, tmp_path, capsys):
+    def test_update_layout_split_rejected(self, tmp_path, capsys):
         repo = create_sample_repo(tmp_path)
-        exit_code = main(["update", str(repo), "--profile", "split"])
+        exit_code = main(["update", str(repo), "--layout", "split"])
 
         assert exit_code == 1
         err = capsys.readouterr().err
         assert "split" in err and "not implemented yet" in err
+
+
+class TestMultifileGeneration:
+    def test_multifile_writes_root_and_section_files(self, tmp_path, monkeypatch):
+        repo = create_sample_repo(tmp_path / "repo")
+        monkeypatch.chdir(tmp_path)
+        out_file = Path("output/AGENTS.md")
+
+        exit_code = main(
+            [
+                "generate",
+                str(repo),
+                "--layout",
+                "multifile",
+                "--out",
+                str(out_file),
+            ]
+        )
+
+        assert exit_code == 0
+        assert Path("output/AGENTS.md").exists()
+        assert Path("output/agents").is_dir()
+        assert Path("output/agents/01_OVERVIEW.md").exists()
+        assert Path("output/agents/15_RED_LINES.md").exists()
+
+    def test_root_contains_section_index(self, tmp_path, monkeypatch):
+        repo = create_sample_repo(tmp_path / "repo")
+        monkeypatch.chdir(tmp_path)
+        out_file = Path("output/AGENTS.md")
+
+        main(
+            [
+                "generate",
+                str(repo),
+                "--layout",
+                "multifile",
+                "--out",
+                str(out_file),
+            ]
+        )
+
+        root_text = Path("output/AGENTS.md").read_text()
+        assert "# AGENTS.md" in root_text
+        assert "Section Index" in root_text
+        assert "agents/01_OVERVIEW.md" in root_text
+        assert "agents/15_RED_LINES.md" in root_text
+
+    def test_root_does_not_contain_full_section_content(self, tmp_path, monkeypatch):
+        repo = create_sample_repo(tmp_path / "repo")
+        monkeypatch.chdir(tmp_path)
+        out_file = Path("output/AGENTS.md")
+
+        main(
+            [
+                "generate",
+                str(repo),
+                "--layout",
+                "multifile",
+                "--out",
+                str(out_file),
+            ]
+        )
+
+        root_text = Path("output/AGENTS.md").read_text()
+        assert "## 6. Code Formatting" not in root_text
+
+    def test_section_files_contain_headings(self, tmp_path, monkeypatch):
+        repo = create_sample_repo(tmp_path / "repo")
+        monkeypatch.chdir(tmp_path)
+        out_file = Path("output/AGENTS.md")
+
+        main(
+            [
+                "generate",
+                str(repo),
+                "--layout",
+                "multifile",
+                "--out",
+                str(out_file),
+            ]
+        )
+
+        overview_text = Path("output/agents/01_OVERVIEW.md").read_text()
+        assert "# 1. Overview" in overview_text
+
+    def test_section_files_contain_backlinks(self, tmp_path, monkeypatch):
+        repo = create_sample_repo(tmp_path / "repo")
+        monkeypatch.chdir(tmp_path)
+        out_file = Path("output/AGENTS.md")
+
+        main(
+            [
+                "generate",
+                str(repo),
+                "--layout",
+                "multifile",
+                "--out",
+                str(out_file),
+            ]
+        )
+
+        overview_text = Path("output/agents/01_OVERVIEW.md").read_text()
+        assert "AGENTS.md" in overview_text
+
+    def test_section_files_have_correct_names(self, tmp_path, monkeypatch):
+        repo = create_sample_repo(tmp_path / "repo")
+        monkeypatch.chdir(tmp_path)
+        out_file = Path("output/AGENTS.md")
+
+        main(
+            [
+                "generate",
+                str(repo),
+                "--layout",
+                "multifile",
+                "--out",
+                str(out_file),
+            ]
+        )
+
+        expected_files = [
+            "01_OVERVIEW.md",
+            "02_REPOSITORY_STRUCTURE.md",
+            "05_COMMANDS_AND_WORKFLOWS.md",
+            "06_CODE_FORMATTING.md",
+            "15_RED_LINES.md",
+        ]
+
+        agents_dir = Path("output/agents")
+        for filename in expected_files:
+            assert (agents_dir / filename).exists(), f"Missing section file: {filename}"
+
+    def test_multifile_deterministic_across_runs(self, tmp_path, monkeypatch):
+        repo = create_sample_repo(tmp_path / "repo")
+        monkeypatch.chdir(tmp_path)
+
+        out_a = Path("run_a/AGENTS.md")
+        main(
+            [
+                "generate",
+                str(repo),
+                "--layout",
+                "multifile",
+                "--out",
+                str(out_a),
+            ]
+        )
+
+        root_a = Path("run_a/AGENTS.md").read_text()
+        out_b = Path("run_b/AGENTS.md")
+
+        main(
+            [
+                "generate",
+                str(repo),
+                "--layout",
+                "multifile",
+                "--out",
+                str(out_b),
+            ]
+        )
+
+        root_b = Path("run_b/AGENTS.md").read_text()
+        assert root_a == root_b
+
+    def test_multifile_with_profile_comprehensive(self, tmp_path, monkeypatch):
+        repo = create_sample_repo(tmp_path / "repo")
+        monkeypatch.chdir(tmp_path)
+        out_concise = Path("concise/AGENTS.md")
+        out_comp = Path("comp/AGENTS.md")
+
+        main(
+            [
+                "generate",
+                str(repo),
+                "--layout",
+                "multifile",
+                "--profile",
+                "concise",
+                "--out",
+                str(out_concise),
+            ]
+        )
+
+        main(
+            [
+                "generate",
+                str(repo),
+                "--layout",
+                "multifile",
+                "--profile",
+                "comprehensive",
+                "--out",
+                str(out_comp),
+            ]
+        )
+
+        concise_red_lines = Path("concise/agents/15_RED_LINES.md").read_text()
+        comp_red_lines = Path("comp/agents/15_RED_LINES.md").read_text()
+        assert len(comp_red_lines) > len(concise_red_lines)
+
+
+class TestMultifileFailurePaths:
+    def test_multifile_without_out_fails(self, tmp_path, capsys):
+        repo = create_sample_repo(tmp_path)
+        exit_code = main(["generate", str(repo), "--layout", "multifile"])
+
+        assert exit_code == 1
+        assert "--out" in capsys.readouterr().err
+
+    def test_update_layout_multifile_rejected(self, tmp_path, capsys):
+        repo = create_sample_repo(tmp_path)
+        exit_code = main(["update", str(repo), "--layout", "multifile"])
+
+        assert exit_code == 1
+        err = capsys.readouterr().err
+        assert "multifile" in err and "not implemented yet" in err

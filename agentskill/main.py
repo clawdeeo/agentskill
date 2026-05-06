@@ -6,6 +6,10 @@ import sys
 from agentskill.lib.generate_runner import generate_agents
 from agentskill.lib.logging_utils import configure_logging
 from agentskill.lib.output import run_and_output, write_output
+from agentskill.lib.output_layouts import (
+    DEFAULT_OUTPUT_LAYOUT,
+    validate_output_layout,
+)
 from agentskill.lib.output_profiles import (
     DEFAULT_OUTPUT_PROFILE,
     validate_output_profile,
@@ -65,6 +69,12 @@ def cmd_update(args: argparse.Namespace) -> int:
         print(str(exc), file=sys.stderr)
         return 1
 
+    try:
+        layout = validate_output_layout(getattr(args, "layout", DEFAULT_OUTPUT_LAYOUT))
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
     return update_agents(
         args.repo,
         include_sections=getattr(args, "section", None),
@@ -72,6 +82,7 @@ def cmd_update(args: argparse.Namespace) -> int:
         force=args.force,
         out=getattr(args, "out", None),
         profile=profile,
+        layout=layout,
     )
 
 
@@ -88,12 +99,19 @@ def cmd_generate(args: argparse.Namespace) -> int:
         print(str(exc), file=sys.stderr)
         return 1
 
+    try:
+        layout = validate_output_layout(getattr(args, "layout", DEFAULT_OUTPUT_LAYOUT))
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
     return generate_agents(
         args.repo,
         out=getattr(args, "out", None),
         references=getattr(args, "reference", None),
         interactive=getattr(args, "interactive", False),
         profile=profile,
+        layout=layout,
     )
 
 
@@ -187,6 +205,12 @@ def main(argv: list[str] | None = None) -> int:
         help=f"Output profile (default: {DEFAULT_OUTPUT_PROFILE})",
     )
 
+    p_update.add_argument(
+        "--layout",
+        default=DEFAULT_OUTPUT_LAYOUT,
+        help=f"Output layout (default: {DEFAULT_OUTPUT_LAYOUT})",
+    )
+
     p_generate = sub.add_parser(
         "generate", help="Generate AGENTS.md markdown from repository analysis"
     )
@@ -209,6 +233,12 @@ def main(argv: list[str] | None = None) -> int:
         "--profile",
         default=DEFAULT_OUTPUT_PROFILE,
         help=f"Output profile (default: {DEFAULT_OUTPUT_PROFILE})",
+    )
+
+    p_generate.add_argument(
+        "--layout",
+        default=DEFAULT_OUTPUT_LAYOUT,
+        help=f"Output layout (default: {DEFAULT_OUTPUT_LAYOUT})",
     )
 
     for p in [
