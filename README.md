@@ -97,33 +97,46 @@ shapes for multi-language analysis.
 
 ## Generation Modes
 
-agentskill supports two complementary generation workflows:
+agentskill supports two distinct generation modes:
 
-### Static Generation
+### Static Generation (CLI)
 
-Use the CLI when you want deterministic output based on analyzer results plus
-static source inspection.
+Use the CLI when you want deterministic output produced by the packaged
+runtime without an LLM in the loop.
 
 - `agentskill analyze <repo> --pretty` for combined machine-readable analysis
 - `agentskill generate <repo>` for a fresh `AGENTS.md` draft
 - `agentskill generate <repo> --profile comprehensive` for a richer draft with representative snippets and expanded detail
-- `agentskill update <repo>` for deterministic regeneration of an existing
-  `AGENTS.md`
+- `agentskill generate <repo> --layout split --out AGENTS.md` for separate concise primary plus comprehensive companion
+- `agentskill generate <repo> --layout multifile --out AGENTS.md` for per-section markdown files with a root index
+- `agentskill update <repo>` for deterministic regeneration of an existing `AGENTS.md`
 
-This is the default mode for users who want a direct tool-driven workflow
-without relying on an external agent harness.
+This is the right mode for CI workflows, automation, and operator-driven
+usage where the packaged runtime produces the final document.
 
-### Artificial Generation
+### AI-Assisted Generation (Skill)
 
 This repository is also distributed as a dedicated skill through the repo-root
-[`SKILL.md`](./SKILL.md). In that mode, an agent harness can install the skill,
-follow the skill workflow, and use the same analyzers plus the richer
-skill/system instructions to synthesize or update `AGENTS.md`.
+[`SKILL.md`](./SKILL.md). In this mode, an agent harness installs the skill,
+follows the workflow defined in `SKILL.md`, and the **model itself authors**
+the final `AGENTS.md` from gathered evidence.
+
+In skill mode:
+
+- The agent uses analyzer commands (`analyze`, `scan`, `measure`, `config`,
+  `git`, `graph`, `symbols`, `tests`) to extract repository facts.
+- The agent asks the user which **profile** (concise or comprehensive) and
+  **layout** (single, split, or multifile) they want before generating.
+- The **model synthesizes the final document itself** — it does not call
+  `agentskill generate` to produce the output.
+- This allows richer, more adaptive generation than CLI static output can
+  provide: interactive feedback, context-aware section depth, and conversational
+  refinement.
 
 In short:
 
-- use the CLI for basic static generation,
-- use the skill for agent-assisted or marketplace-installed generation.
+- use the CLI for **deterministic static generation**,
+- use the skill for **AI-authored generation** with richer adaptation.
 
 ---
 
@@ -179,13 +192,27 @@ references/         # gotchas and supporting guidance
 examples/           # fixture repos and reference shapes
 ```
 
-After a harness installs the skill, the usual operator-facing commands remain:
+After a harness installs the skill, the analyzer commands remain available
+for evidence gathering:
 
 ```bash
+# Evidence gathering (used in skill mode)
 agentskill analyze <repo> --pretty
+agentskill scan <repo> --pretty
+agentskill measure <repo> --lang python --pretty
+agentskill config <repo> --pretty
+agentskill git <repo> --pretty
+agentskill graph <repo> --pretty
+agentskill symbols <repo> --pretty
+agentskill tests <repo> --pretty
+
+# Static generation (CLI/operator mode only, not for skill workflows)
 agentskill generate <repo>
 agentskill update <repo>
 ```
+
+In skill mode, the model authors the final `AGENTS.md` itself. The
+`generate` and `update` commands are for direct CLI use only.
 
 ---
 
@@ -250,6 +277,7 @@ agentskill generate <repo> --profile concise
 agentskill generate <repo> --profile comprehensive
 agentskill generate <repo> --layout split --out AGENTS.md
 agentskill generate <repo> --layout multifile --out AGENTS.md
+agentskill generate <repo> --layout multifile --profile concise --out AGENTS.md
 
 # Update or create AGENTS.md in place
 agentskill update <repo>
@@ -326,11 +354,14 @@ merges them with any existing `AGENTS.md`, and writes the result back to
 - Use `--force` for a clean-slate rebuild that drops preserved/manual sections
   and ignores preservation hints from feedback.
 
-### Output Profiles
+### Output Profiles and Layouts
 
-Both `generate` and `update` accept `--profile` to control rendering density.
-The profile affects how much detail appears in each section without changing
-section order, section headings, or the underlying analyzer facts.
+`generate` and `update` accept `--profile` to control content density. `generate`
+also accepts `--layout` to control how the output is packaged across files.
+
+#### Profiles (content density)
+
+Both `generate` and `update` accept `--profile`:
 
 - `--profile concise` (default) — operational rules and key facts only; omits
   representative code snippets and secondary explanatory bullets.
@@ -338,31 +369,77 @@ section order, section headings, or the underlying analyzer facts.
   representative snippets, annotation counts, expanded explanatory bullets,
   and richer provenance from analyzer results.
 
-All profiles produce deterministic output from the same analyzer results.
+All profiles produce deterministic output from the same analyzer results. The
+same section headings and section order are preserved regardless of profile.
 
-### Output Layouts
+#### Layouts (output packaging)
 
-`generate` accepts `--layout` to control output packaging. The layout
-determines how the generated markdown is split across files without changing
-the section content or profile density.
+`generate` accepts `--layout` to control file packaging:
 
 - `--layout single` (default) — writes one complete markdown file.
-- `--layout split` — writes two files from a single analysis pass: a concise
-  primary `AGENTS.md` and an extended `AGENTS.reference.md` companion with
-  comprehensive-style content. The primary file links to the companion.
-  Split mode requires `--out` because it writes multiple files.
-- `--layout multifile` — writes a compact root index plus per-section
-  markdown files in an `agents/` directory beside the primary output. Each
-  section file includes a backlink to the root. Multifile mode requires
-  `--out`.
+- `--layout split` — writes two files: a concise primary document and an
+  `AGENTS.reference.md` companion with comprehensive content. The primary file
+  links to the companion. Split mode always uses concise for the primary and
+  comprehensive for the companion regardless of the `--profile` flag; the
+  `--profile` flag only affects `single` and `multifile` layouts.
+- `--layout multifile` — writes a compact root index plus per-section markdown
+  files in an `agents/` directory beside the primary output. Each section file
+  includes a backlink to the root. The `--profile` flag controls the density of
+  content in each section file. Multifile section filenames follow a stable
+  numbering scheme:
 
-`update --layout` is not yet supported for `split` or `multifile`.
+  ```text
+  AGENTS.md
+  agents/
+    01_OVERVIEW.md
+    02_REPOSITORY_STRUCTURE.md
+    05_COMMANDS_AND_WORKFLOWS.md
+    06_CODE_FORMATTING.md
+    07_NAMING_CONVENTIONS.md
+    08_TYPE_ANNOTATIONS.md
+    09_IMPORTS.md
+    10_ERROR_HANDLING.md
+    11_COMMENTS_AND_DOCSTRINGS.md
+    12_TESTING.md
+    13_GIT.md
+    14_DEPENDENCIES_AND_TOOLING.md
+    15_RED_LINES.md
+  ```
+
+#### How profile and layout interact
+
+| Layout      | `--profile` applies to                  | Default profile |
+|-------------|-----------------------------------------|-----------------|
+| `single`    | Single output file                      | `concise`       |
+| `split`     | Ignored; primary is concise, companion is comprehensive | N/A  |
+| `multifile` | Content in each section file            | `comprehensive` |
+
+#### Required flags
+
+- `--layout split` requires `--out` because it writes multiple files.
+- `--layout multifile` requires `--out` because it writes a directory tree.
+- `--layout single` works with or without `--out`.
+
+#### Update constraints
+
+`update` only supports `--layout single` (the default). Passing
+`--layout split` or `--layout multifile` to `update` is explicitly rejected
+with a clear error message. This constraint may be lifted in a future release.
 
 ```bash
-agentskill generate <repo> --profile concise
+# Single-file generation (default)
+agentskill generate <repo>
 agentskill generate <repo> --profile comprehensive
+
+# Split generation
 agentskill generate <repo> --layout split --out AGENTS.md
+
+# Multifile generation
 agentskill generate <repo> --layout multifile --out AGENTS.md
+agentskill generate <repo> --layout multifile --profile concise --out AGENTS.md
+
+# Update (single layout only)
+agentskill update <repo>
 agentskill update <repo> --profile comprehensive
 ```
 

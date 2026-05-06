@@ -383,6 +383,29 @@ When operating on a monorepo, treat each top-level service or package as its own
 
 ---
 
+## AI Authorship
+
+When operating as a skill or in any LLM-backed workflow:
+
+- **The model is responsible for composing the final `AGENTS.md`.**
+- Do not delegate final document generation to the CLI `generate` command.
+- Analyzer outputs are evidence, not the finished document. The model must
+  synthesize each section from gathered evidence plus direct source file reads.
+- CLI commands such as `scan`, `measure`, `config`, `git`, `graph`, `symbols`,
+  and `tests` exist to extract facts the model cannot reliably derive. They are
+  supporting tools, not replacements for the model's own synthesis.
+- When the user specifies an output profile (concise or comprehensive) or layout
+  (single, split, or multifile), the model must respect that choice in the
+  authored output. Layout determines file packaging; profile determines content
+  density.
+
+This rule exists because the skill workflow is designed for richer, more
+adaptive generation than CLI static output can provide. The model can tailor
+section depth, omit empty sections, adjust emphasis, and incorporate interactive
+feedback — none of which the CLI `generate` command does.
+
+---
+
 ## Output Format Rules
 
 The `AGENTS.md` agentskill produces must follow these formatting rules:

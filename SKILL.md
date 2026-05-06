@@ -1,6 +1,6 @@
 ---
 name: agentskill
-description: Analyze a code repository and synthesize an AGENTS.md.
+description: Let any agent produce code indistinguishable from the existing codebase.
 ---
 
 # SKILL.md — agentskill
@@ -15,6 +15,47 @@ description: Analyze a code repository and synthesize an AGENTS.md.
 ## Purpose
 
 Analyze one or more code repositories. Extract exact coding conventions. Synthesize a precise, forensic `AGENTS.md` that allows any agent to produce code indistinguishable from the existing codebase.
+
+---
+
+## Generation Modes
+
+agentskill supports two generation modes. The mode determines who authors the
+final document:
+
+### AI-led generation (skill mode — this file)
+
+The model synthesizes the final `AGENTS.md` itself. CLI analyzer commands are
+used **only for evidence gathering** — to extract repository facts that the
+model cannot derive reliably from reading source files alone.
+
+**In skill mode, never call `agentskill generate` to produce the final
+`AGENTS.md`.** The model is the author. Analyzer output is the raw material,
+not the finished product.
+
+### CLI static generation (operator mode)
+
+The user runs `agentskill generate` directly. The packaged runtime emits
+markdown automatically. This is appropriate for deterministic direct generation
+without an LLM in the loop.
+
+**Use CLI generation only in non-LLM static/operator workflows where the user
+explicitly wants tool-generated markdown rather than AI-authored synthesis.**
+
+---
+
+## Rule: AI Authorship
+
+> **The model authors the final document in skill mode.**
+
+- Do not use `agentskill generate` or `python scripts/generate.py` to produce
+  the final `AGENTS.md` when operating as a skill or in any AI-assisted
+  workflow.
+- Use analyzer commands (`analyze`, `scan`, `measure`, `config`, `git`, `graph`,
+  `symbols`, `tests`) to gather repository facts.
+- The final generated markdown must be synthesized by the AI from analyzer
+  evidence, direct source file reads, and supporting documentation.
+- Treat analyzer outputs as evidence, not as the final authored document.
 
 ---
 
@@ -164,9 +205,69 @@ If this skill was downloaded from ClawHub, or if `examples/` is unavailable loca
 
 ---
 
-### Step 9 — Synthesize
+### Step 9 — Choose Output Shape
+
+Before generating, determine the output profile and layout. Skip this step only
+if the user has already specified both preferences.
+
+**Profile** controls content density:
+
+| Profile         | Description                                              |
+| --------------- | -------------------------------------------------------- |
+| `concise`       | Shorter, high-signal operational guidance only           |
+| `comprehensive` | Full detail with representative snippets and expanded rationale |
+
+**Layout** controls output packaging:
+
+| Layout      | Description                                                               |
+| ----------- | ------------------------------------------------------------------------- |
+| `single`    | One complete markdown file (default)                                      |
+| `split`     | Concise primary file plus comprehensive companion reference doc           |
+| `multifile` | Root index file plus one markdown file per section in an `agents/` dir   |
+
+**Asking the user:**
+
+If generation intent is clear but neither profile nor layout has been specified,
+ask the user briefly:
+
+```
+Which output shape do you want?
+Profile: concise or comprehensive
+Layout: single file, split, or multifile
+```
+
+**Handling partial or delegated preference:**
+
+| User response                            | Action                                                  |
+| ---------------------------------------- | ------------------------------------------------------- |
+| Both profile and layout specified        | Use their choices; do not ask again                     |
+| One specified, the other missing         | Ask only for the missing choice                         |
+| "default" or "whatever is best"         | Use profile `concise` and layout `single`               |
+| Only layout chosen                       | Use profile `concise` unless layout is `multifile`, then use profile `comprehensive` |
+
+**Important:** Do not silently choose `split` or `multifile` when the user has
+not requested a multi-document layout. These layouts produce multiple files and
+change how the output is consumed — the user must opt in explicitly.
+
+**For update workflows:** Only `single` layout is supported. If the user
+requests `split` or `multifile` layout for an update, explain that only single
+layout is currently supported for updates, then proceed with `single`.
+
+After selection, confirm the chosen shape in one line before proceeding:
+
+```
+Generating: profile=concise, layout=single
+```
+
+---
+
+### Step 10 — Synthesize
 
 Follow SYSTEM.md **section by section**, in the exact order specified.
+
+**You are the author.** Do not delegate final generation to `agentskill generate`.
+Compose each section from the evidence gathered in Steps 2–8 and the source
+reads in Step 6.
 
 **Source of truth per data type:**
 
@@ -188,7 +289,7 @@ Apply the **Mimicry Test** from SYSTEM.md to each section before moving to the n
 
 ---
 
-### Step 10 — Handle Uncertainty
+### Step 11 — Handle Uncertainty
 
 When you are uncertain about a pattern mid-synthesis, apply this decision tree — do not silently guess:
 
@@ -212,9 +313,19 @@ Is the uncertainty minor and isolated to one sub-rule?
 
 ---
 
-### Step 11 — Write
+### Step 12 — Write
 
-Write the final `AGENTS.md` to the repo root.
+Write the output according to the layout chosen in Step 9.
+
+**Layout: `single`** — Write one `AGENTS.md` file.
+
+**Layout: `split`** — Write two files:
+- `AGENTS.md` — concise primary with a link to the companion
+- `AGENTS.reference.md` — comprehensive companion reference
+
+**Layout: `multifile`** — Write a root index plus per-section files:
+- `AGENTS.md` — root index with section links
+- `agents/01_OVERVIEW.md`, `agents/02_REPOSITORY_STRUCTURE.md`, ... — one file per section, each with a backlink to the root
 
 **If this is a new file:** Write directly.
 
@@ -228,6 +339,7 @@ After writing, output a brief summary:
 
 ```
 AGENTS.md written.
+Profile: concise | Layout: single
 
 Sections completed:    15 / 15
 Tentative rules:       [list them, or "none"]
@@ -259,6 +371,8 @@ Everything else — error handling patterns, comment style, docstring format, ar
 
 All scripts require Python stdlib only. No installation needed beyond `pip install -e .`.
 
+**Analyzer scripts (for evidence gathering in skill mode):**
+
 ```bash
 # Aggregate analyzer wrapper
 python scripts/analyze.py <repo>
@@ -285,17 +399,28 @@ python scripts/symbols.py <repo>
 # Test-to-source mapping, framework detection, fixture extraction
 python scripts/tests.py <repo>
 
-# Fresh AGENTS.md draft
-python scripts/generate.py <repo>
-
-# Update or create AGENTS.md in place
-python scripts/update.py <repo>
-
 # Run all seven analyzers in parallel and merge output
 agentskill analyze <repo> --pretty
 ```
 
-All scripts output JSON to stdout. Pass `--pretty` for human-readable output. Pass `--out <file>` to write to disk.
+**CLI generation (for operator/static use only, not for skill mode):**
+
+```bash
+# Direct static generation — do not use in skill/AI workflows
+agentskill generate <repo>
+agentskill generate <repo> --profile comprehensive
+agentskill generate <repo> --layout split --out AGENTS.md
+agentskill generate <repo> --layout multifile --out AGENTS.md
+
+# Update or create AGENTS.md in place (only layout=single supported)
+agentskill update <repo> --profile comprehensive
+```
+
+Analyzer scripts output JSON to stdout. Pass `--pretty` for human-readable output. Pass `--out <file>` to write to disk.
+
+> **Boundary rule:** In skill mode, the generate and update commands are
+> available for the user's direct CLI use only. The model must not call them
+> to produce the final `AGENTS.md`.
 
 ---
 
@@ -309,6 +434,7 @@ All scripts output JSON to stdout. Pass `--pretty` for human-readable output. Pa
 | Entire section unmeasurable                | Surface to user; ask before proceeding                                    |
 | Existing `AGENTS.md` present               | Diff and confirm before overwriting                                       |
 | No matching example in `examples/`         | Skip Step 8; do not use a mismatched example                              |
+| User requests update with split/multifile  | Explain only single layout is supported for updates; proceed with single |
 
 ---
 
@@ -324,6 +450,7 @@ All scripts output JSON to stdout. Pass `--pretty` for human-readable output. Pa
 - **No statistics in output.** No counts, percentages, or confidence levels in `AGENTS.md`.
 - **Mimicry test per section.** Apply it before moving on, not at the end.
 - **Uncertainty surfaces up.** Never silently guess. Never silently omit.
+- **AI authors the final document.** In skill mode, do not call `generate` to produce the final output. Analyzer commands gather evidence; the model writes the document.
 
 ---
 

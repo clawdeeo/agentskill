@@ -37,10 +37,28 @@ rules, and keep the CLI-facing output contract consistent.
   Primary helper: `merge_agents_document(...)`
 - Module: `agentskill.lib.update_feedback`
   Primary helper: `load_feedback(repo_path: str | Path) -> UpdateFeedback`
+- Module: `agentskill.lib.output_profiles`
+  Primary callables: `validate_output_profile(profile: str) -> str`
+  Constants: `DEFAULT_OUTPUT_PROFILE`, `SUPPORTED_OUTPUT_PROFILES`
+- Module: `agentskill.lib.output_layouts`
+  Primary callables: `validate_output_layout(layout: str) -> str`
+  Constants: `DEFAULT_OUTPUT_LAYOUT`, `SUPPORTED_OUTPUT_LAYOUTS`
+- Module: `agentskill.lib.profile_rendering`
+  Primary callables: `combine_section_body(...)`, `build_companion_document(...)`, `inject_split_link(...)`, `companion_path(...)`, `companion_relative_link(...)`
+- Module: `agentskill.lib.multifile_output`
+  Primary callables: `section_file_path(...)`, `build_section_file(...)`, `build_root_index(...)`
+  Constants: `SECTION_FILE_MAP`, `SECTION_DESCRIPTIONS`, `SECTION_DIR`
 
 `generate_runner` produces a fresh document without merge semantics.
 `update_runner` regenerates sections and merges them into an existing
 `AGENTS.md` unless `--force` requests a clean rebuild.
+
+Profile and layout handling: `--profile` controls content density (`concise`
+or `comprehensive`). `--layout` controls output packaging (`single`, `split`,
+or `multifile`). Split layout writes a concise primary plus comprehensive
+companion regardless of the profile flag. Multifile layout writes a root
+index plus per-section files using the specified profile (default
+`comprehensive`).
 
 ## Reference and Interactive Flows
 
