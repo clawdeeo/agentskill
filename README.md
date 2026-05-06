@@ -245,6 +245,7 @@ agentskill generate <repo>
 agentskill generate <repo> --out AGENTS.md
 agentskill generate <repo> --reference ../ref-a --reference ../ref-b
 agentskill generate <repo> --interactive
+agentskill generate <repo> --profile comprehensive
 
 # Update or create AGENTS.md in place
 agentskill update <repo>
@@ -252,6 +253,7 @@ agentskill update <repo> --section testing
 agentskill update <repo> --exclude-section git
 agentskill update <repo> --force
 agentskill update <repo> --out updated-AGENTS.md
+agentskill update <repo> --profile concise
 
 # Retained wrapper entrypoints for operator/skill workflows
 python scripts/analyze.py <repo> --pretty

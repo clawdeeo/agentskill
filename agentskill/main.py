@@ -6,6 +6,10 @@ import sys
 from agentskill.lib.generate_runner import generate_agents
 from agentskill.lib.logging_utils import configure_logging
 from agentskill.lib.output import run_and_output, write_output
+from agentskill.lib.output_profiles import (
+    DEFAULT_OUTPUT_PROFILE,
+    validate_output_profile,
+)
 from agentskill.lib.runner import COMMANDS, run_many
 from agentskill.lib.update_runner import update_agents
 
@@ -53,12 +57,21 @@ def cmd_update(args: argparse.Namespace) -> int:
         print("update does not support --pretty", file=sys.stderr)
         return 1
 
+    try:
+        profile = validate_output_profile(
+            getattr(args, "profile", DEFAULT_OUTPUT_PROFILE)
+        )
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
     return update_agents(
         args.repo,
         include_sections=getattr(args, "section", None),
         exclude_sections=getattr(args, "exclude_section", None),
         force=args.force,
         out=getattr(args, "out", None),
+        profile=profile,
     )
 
 
@@ -67,11 +80,20 @@ def cmd_generate(args: argparse.Namespace) -> int:
         print("generate does not support --pretty", file=sys.stderr)
         return 1
 
+    try:
+        profile = validate_output_profile(
+            getattr(args, "profile", DEFAULT_OUTPUT_PROFILE)
+        )
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
     return generate_agents(
         args.repo,
         out=getattr(args, "out", None),
         references=getattr(args, "reference", None),
         interactive=getattr(args, "interactive", False),
+        profile=profile,
     )
 
 
@@ -96,9 +118,11 @@ def main(argv: list[str] | None = None) -> int:
     p_analyze.add_argument(
         "repos", nargs="+", metavar="repo", help="Path(s) to repository"
     )
+
     p_analyze.add_argument(
         "--lang", help="Filter to a single language where applicable"
     )
+
     p_analyze.add_argument(
         "--reference",
         action="append",
@@ -126,48 +150,66 @@ def main(argv: list[str] | None = None) -> int:
     p_symbols = sub.add_parser(
         "symbols", help="Symbol name extraction and pattern clustering"
     )
+
     p_symbols.add_argument("repo", help="Path to repository")
     p_symbols.add_argument("--lang", help="Filter to a single language")
 
     p_tests = sub.add_parser(
         "tests", help="Test-to-source mapping and framework detection"
     )
-    p_tests.add_argument("repo", help="Path to repository")
 
+    p_tests.add_argument("repo", help="Path to repository")
     p_update = sub.add_parser("update", help="Update or create AGENTS.md")
     p_update.add_argument("repo", help="Path to repository")
+
     p_update.add_argument(
         "--section",
         action="append",
         help="Regenerate only the named section; may be repeated",
     )
+
     p_update.add_argument(
         "--exclude-section",
         action="append",
         help="Skip regenerating the named section; may be repeated",
     )
+
     p_update.add_argument(
         "--force",
         action="store_true",
         help="Rebuild AGENTS.md from regenerated sections only",
     )
+
     p_update.add_argument("--out", metavar="FILE", help="Write markdown to file")
+    p_update.add_argument(
+        "--profile",
+        default=DEFAULT_OUTPUT_PROFILE,
+        help=f"Output profile (default: {DEFAULT_OUTPUT_PROFILE})",
+    )
 
     p_generate = sub.add_parser(
         "generate", help="Generate AGENTS.md markdown from repository analysis"
     )
+
     p_generate.add_argument("repo", help="Path to repository")
     p_generate.add_argument(
         "--reference",
         action="append",
         help="Reference repository path or URL; may be repeated",
     )
+
     p_generate.add_argument(
         "--interactive",
         action="store_true",
         help="Prompt for missing or ambiguous generation inputs",
     )
+
     p_generate.add_argument("--out", metavar="FILE", help="Write markdown to file")
+    p_generate.add_argument(
+        "--profile",
+        default=DEFAULT_OUTPUT_PROFILE,
+        help=f"Output profile (default: {DEFAULT_OUTPUT_PROFILE})",
+    )
 
     for p in [
         p_scan,

@@ -17,6 +17,7 @@ from agentskill.lib.agents_document import (
     normalize_section_name,
 )
 from agentskill.lib.output import validate_out_path
+from agentskill.lib.output_profiles import validate_output_profile
 from agentskill.lib.runner import run_all
 from agentskill.lib.update_feedback import (
     SectionFeedback,
@@ -1030,9 +1031,17 @@ def update_agents(
     exclude_sections: list[str] | None = None,
     force: bool = False,
     out: str | None = None,
+    profile: str = "concise",
 ) -> int:
     """Update or create AGENTS.md for a repository."""
     try:
+        profile = validate_output_profile(profile)
+
+        if profile == "split":
+            raise NotImplementedError(
+                "update with profile 'split' is not implemented yet"
+            )
+
         repo_path = validate_repo(repo)
         analysis = run_all(str(repo_path))
         feedback = load_feedback(repo_path)

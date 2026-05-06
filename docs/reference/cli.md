@@ -39,6 +39,7 @@ generation, and update workflows.
 - `--out` writes JSON or markdown to a file instead of stdout.
 - `--reference` is supported by `analyze` and `generate`.
 - `--interactive` is supported by `generate` only.
+- `--profile` is supported by `generate` and `update`. Accepted values are `concise` (default), `comprehensive`, and `split`. The `split` profile is accepted at the CLI level but raises a not-implemented error until multi-file emission is ready.
 - `--section`, `--exclude-section`, and `--force` are supported by `update`.
 
 Release-grade CLI contract tests live in `tests/test_cli_contract.py`.

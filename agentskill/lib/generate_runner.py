@@ -13,6 +13,7 @@ from agentskill.lib.interactive_runner import (
     interactive_section_notes,
 )
 from agentskill.lib.output import validate_out_path
+from agentskill.lib.output_profiles import validate_output_profile
 from agentskill.lib.reference_flow import load_reference_documents
 from agentskill.lib.reference_initialization import (
     initialize_from_references,
@@ -46,7 +47,15 @@ def render_agents_markdown(
     references: list[str] | None = None,
     interactive: bool = False,
     prompt_io: PromptIO | None = None,
+    profile: str = "concise",
 ) -> str:
+    profile = validate_output_profile(profile)
+
+    if profile == "split":
+        raise NotImplementedError(
+            "generate with profile 'split' is not implemented yet"
+        )
+
     documents = load_reference_documents(references)
     analysis = run_all(str(repo))
     feedback = load_feedback(repo)
@@ -83,6 +92,7 @@ def generate_agents(
     references: list[str] | None = None,
     interactive: bool = False,
     prompt_io: PromptIO | None = None,
+    profile: str = "concise",
 ) -> int:
     try:
         repo_path = validate_repo(repo)
@@ -91,6 +101,7 @@ def generate_agents(
             references=references,
             interactive=interactive,
             prompt_io=prompt_io,
+            profile=profile,
         )
 
         if out is not None:
