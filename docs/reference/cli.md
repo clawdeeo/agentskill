@@ -40,6 +40,9 @@ generation, and update workflows.
 - `--reference` is supported by `analyze` and `generate`.
 - `--interactive` is supported by `generate` only.
 - `--profile` is supported by `generate` and `update`. Accepted values are `concise` (default), `comprehensive`, and `split`. The `split` profile is accepted at the CLI level but raises a not-implemented error until multi-file emission is ready.
+  - `concise` emits operational rules and key facts only; representative code snippets and secondary explanatory bullets are suppressed.
+  - `comprehensive` includes everything from concise plus representative snippets, annotation measurements, and expanded rationale bullets.
+  - Both profiles are deterministic from the same analyzer results and preserve the same section order and headings.
 - `--section`, `--exclude-section`, and `--force` are supported by `update`.
 
 Release-grade CLI contract tests live in `tests/test_cli_contract.py`.

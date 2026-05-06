@@ -5,6 +5,7 @@ from agentskill.lib.output_profiles import (
     SUPPORTED_OUTPUT_PROFILES,
     validate_output_profile,
 )
+from agentskill.lib.profile_rendering import RenderedSectionBody, combine_section_body
 from agentskill.main import main
 
 
@@ -154,3 +155,174 @@ class TestUpdateProfileDefaults:
         concise_text = (repo_b / "AGENTS.md").read_text()
 
         assert default_text == concise_text
+
+
+class TestCombineSectionBody:
+    def test_concise_returns_core_only(self):
+        body = RenderedSectionBody(core="alpha\n", expanded="beta\n")
+        assert combine_section_body("concise", body) == "alpha\n"
+
+    def test_comprehensive_returns_core_plus_expanded(self):
+        body = RenderedSectionBody(core="alpha\n", expanded="beta\n")
+        assert combine_section_body("comprehensive", body) == "alpha\nbeta\n"
+
+    def test_empty_expanded_concise(self):
+        body = RenderedSectionBody(core="alpha\n")
+        assert combine_section_body("concise", body) == "alpha\n"
+
+    def test_empty_expanded_comprehensive(self):
+        body = RenderedSectionBody(core="alpha\n")
+        assert combine_section_body("comprehensive", body) == "alpha\n"
+
+
+SECTION_HEADINGS_IN_ORDER = [
+    "## 1. Overview",
+    "## 2. Repository Structure",
+    "## 5. Commands and Workflows",
+    "## 6. Code Formatting",
+    "## 7. Naming Conventions",
+    "## 8. Type Annotations",
+    "## 9. Imports",
+    "## 10. Error Handling",
+    "## 11. Comments and Docstrings",
+    "## 12. Testing",
+    "## 13. Git",
+    "## 14. Dependencies and Tooling",
+    "## 15. Red Lines",
+]
+
+
+class TestProfileStructuralInvariants:
+    def _headings(self, text: str) -> list[str]:
+        return [
+            line
+            for line in text.splitlines()
+            if line.startswith("## ") and not line.startswith("### ")
+        ]
+
+    def test_concise_has_all_section_headings(self, tmp_path, capsys):
+        repo = create_sample_repo(tmp_path / "c")
+        main(["generate", str(repo), "--profile", "concise"])
+        concise = capsys.readouterr().out
+        headings = self._headings(concise)
+
+        for expected in SECTION_HEADINGS_IN_ORDER:
+            assert expected in headings, f"Missing heading in concise: {expected}"
+
+    def test_comprehensive_has_all_section_headings(self, tmp_path, capsys):
+        repo = create_sample_repo(tmp_path / "c")
+        main(["generate", str(repo), "--profile", "comprehensive"])
+        comprehensive = capsys.readouterr().out
+        headings = self._headings(comprehensive)
+
+        for expected in SECTION_HEADINGS_IN_ORDER:
+            assert expected in headings, f"Missing heading in comprehensive: {expected}"
+
+    def test_headings_are_in_same_order(self, tmp_path, capsys):
+        repo_a = create_sample_repo(tmp_path / "a")
+        repo_b = create_sample_repo(tmp_path / "b")
+        main(["generate", str(repo_a), "--profile", "concise"])
+        concise_headings = self._headings(capsys.readouterr().out)
+        main(["generate", str(repo_b), "--profile", "comprehensive"])
+        comp_headings = self._headings(capsys.readouterr().out)
+        assert concise_headings == comp_headings
+
+
+class TestProfileDensityDifferences:
+    def test_comprehensive_is_longer_than_concise(self, tmp_path, capsys):
+        repo_a = create_sample_repo(tmp_path / "a")
+        repo_b = create_sample_repo(tmp_path / "b")
+        main(["generate", str(repo_a), "--profile", "concise"])
+        concise_len = len(capsys.readouterr().out)
+        main(["generate", str(repo_b), "--profile", "comprehensive"])
+        comp_len = len(capsys.readouterr().out)
+        assert comp_len > concise_len
+
+    def test_concise_omits_code_formatting_snippet(self, tmp_path, capsys):
+        repo = create_sample_repo(tmp_path)
+        main(["generate", str(repo), "--profile", "concise"])
+        concise = capsys.readouterr().out
+        concise_formatting_start = concise.index("## 6. Code Formatting")
+        concise_formatting_end = concise.index("## 7. Naming Conventions")
+        concise_formatting = concise[concise_formatting_start:concise_formatting_end]
+        assert "```" not in concise_formatting
+
+    def test_comprehensive_formatting_includes_indent_rule(self, tmp_path, capsys):
+        repo = create_sample_repo(tmp_path)
+        main(["generate", str(repo), "--profile", "comprehensive"])
+        comp = capsys.readouterr().out
+        comp_formatting_start = comp.index("## 6. Code Formatting")
+        comp_formatting_end = comp.index("## 7. Naming Conventions")
+        comp_formatting = comp[comp_formatting_start:comp_formatting_end]
+        assert "Indent with" in comp_formatting
+
+    def test_concise_omits_import_block(self, tmp_path, capsys):
+        repo = create_sample_repo(tmp_path)
+        main(["generate", str(repo), "--profile", "concise"])
+        concise = capsys.readouterr().out
+        imports_start = concise.index("## 9. Imports")
+        imports_end = concise.index("## 10. Error Handling")
+        concise_imports = concise[imports_start:imports_end]
+        assert "```python" not in concise_imports
+
+    def test_comprehensive_includes_import_block(self, tmp_path, capsys):
+        repo = create_sample_repo(tmp_path)
+        main(["generate", str(repo), "--profile", "comprehensive"])
+        comp = capsys.readouterr().out
+        imports_start = comp.index("## 9. Imports")
+        imports_end = comp.index("## 10. Error Handling")
+        comp_imports = comp[imports_start:imports_end]
+        assert "```" in comp_imports
+
+
+class TestProfileFactConsistency:
+    def test_both_profiles_mention_same_test_framework(self, tmp_path, capsys):
+        repo_a = create_sample_repo(tmp_path / "a")
+        repo_b = create_sample_repo(tmp_path / "b")
+
+        main(["generate", str(repo_a), "--profile", "concise"])
+        concise = capsys.readouterr().out
+
+        main(["generate", str(repo_b), "--profile", "comprehensive"])
+        comp = capsys.readouterr().out
+
+        assert "pytest" in concise
+        assert "pytest" in comp
+
+    def test_both_profiles_mention_indentation_rule(self, tmp_path, capsys):
+        repo_a = create_sample_repo(tmp_path / "a")
+        repo_b = create_sample_repo(tmp_path / "b")
+
+        main(["generate", str(repo_a), "--profile", "concise"])
+        concise = capsys.readouterr().out
+
+        main(["generate", str(repo_b), "--profile", "comprehensive"])
+        comp = capsys.readouterr().out
+
+        assert "Indent with" in concise
+        assert "Indent with" in comp
+
+    def test_both_profiles_mention_red_lines(self, tmp_path, capsys):
+        repo_a = create_sample_repo(tmp_path / "a")
+        repo_b = create_sample_repo(tmp_path / "b")
+
+        main(["generate", str(repo_a), "--profile", "concise"])
+        concise = capsys.readouterr().out
+
+        main(["generate", str(repo_b), "--profile", "comprehensive"])
+        comp = capsys.readouterr().out
+
+        assert "Do not" in concise
+        assert "Do not" in comp
+
+    def test_update_uses_selected_profile_density(self, tmp_path):
+        repo_a = create_sample_repo(tmp_path / "a")
+        repo_b = create_sample_repo(tmp_path / "b")
+
+        main(["update", str(repo_a), "--profile", "concise"])
+        concise_text = (repo_a / "AGENTS.md").read_text()
+
+        main(["update", str(repo_b), "--profile", "comprehensive"])
+        comp_text = (repo_b / "AGENTS.md").read_text()
+
+        assert len(comp_text) > len(concise_text)

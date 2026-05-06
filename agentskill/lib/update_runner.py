@@ -18,6 +18,7 @@ from agentskill.lib.agents_document import (
 )
 from agentskill.lib.output import validate_out_path
 from agentskill.lib.output_profiles import validate_output_profile
+from agentskill.lib.profile_rendering import RenderedSectionBody, combine_section_body
 from agentskill.lib.runner import run_all
 from agentskill.lib.update_feedback import (
     SectionFeedback,
@@ -162,7 +163,7 @@ def _python_commands(config: dict, tests: dict) -> list[str]:
     return commands
 
 
-def _render_overview(repo: Path, analysis: dict) -> str:
+def _render_overview(repo: Path, analysis: dict) -> RenderedSectionBody:
     scan = analysis.get("scan", {})
     graph = analysis.get("graph", {})
     boundaries = graph.get("monorepo_boundaries", {})
@@ -191,10 +192,16 @@ def _render_overview(repo: Path, analysis: dict) -> str:
         f"The primary language set detected here is {languages}, and the codebase is organized as a {architecture} with analyzer-driven markdown generation."
     )
 
-    return " ".join(parts) + "\n"
+    core = " ".join(parts) + "\n"
+    expanded = ""
+
+    if cli_names and readme_summary:
+        expanded = f"The published console scripts include `{cli_names}`.\n"
+
+    return RenderedSectionBody(core=core, expanded=expanded)
 
 
-def _render_repository_structure(analysis: dict) -> str:
+def _render_repository_structure(analysis: dict) -> RenderedSectionBody:
     scan = analysis.get("scan", {})
     lines = _top_level_layout(scan)
     body = [
@@ -206,18 +213,21 @@ def _render_repository_structure(analysis: dict) -> str:
 
     line_text = "\n".join(lines)
 
+    core_bullets: list[str] = []
+    expanded_bullets: list[str] = []
+
     if "tests/" in line_text:
-        body.append(
+        core_bullets.append(
             "- Keep tests under `tests/`; this repo separates tests from source."
         )
 
     if "scripts/" in line_text:
-        body.append(
+        core_bullets.append(
             "- Keep direct-execution wrappers under `scripts/`; use the packaged runtime for reusable logic."
         )
 
     if "examples/" in line_text:
-        body.append(
+        core_bullets.append(
             "- Keep example or fixture repositories under `examples/`; do not mix them into runtime packages."
         )
 
@@ -226,31 +236,48 @@ def _render_repository_structure(analysis: dict) -> str:
     ]
 
     if source_roots:
-        body.append(
+        core_bullets.append(
             f"- Keep new source files under existing roots such as `{source_roots[0]}`."
         )
 
-    return "\n".join(body) + "\n"
+    if len(source_roots) > 1:
+        expanded_bullets.append(
+            f"- Additional source roots detected: {', '.join(f'`{r}`' for r in source_roots[1:])}."
+        )
+
+    core = "\n".join(body + core_bullets) + "\n"
+    expanded = ""
+
+    if expanded_bullets:
+        expanded = "\n".join(expanded_bullets) + "\n"
+
+    return RenderedSectionBody(core=core, expanded=expanded)
 
 
-def _render_service_map(analysis: dict) -> str | None:
+def _render_service_map(analysis: dict) -> RenderedSectionBody | None:
     boundaries = analysis.get("graph", {}).get("monorepo_boundaries", {})
     services = boundaries.get("services", [])
 
     if not boundaries.get("detected") or not services:
         return None
 
-    lines = []
+    core_lines: list[str] = []
+    expanded_lines: list[str] = []
 
     for service in services:
-        lines.append(f"### {service}")
-        lines.append(f"- Service root: `{service}`")
-        lines.append("")
+        core_lines.append(f"- `{service}`: service root at `{service}`")
+        expanded_lines.append(f"  - Service root: `{service}`")
 
-    return "\n".join(lines).rstrip() + "\n"
+    core = "\n".join(core_lines) + "\n"
+    expanded = ""
+
+    if expanded_lines:
+        expanded = "\n".join(expanded_lines) + "\n"
+
+    return RenderedSectionBody(core=core, expanded=expanded)
 
 
-def _render_cross_service_boundaries(analysis: dict) -> str | None:
+def _render_cross_service_boundaries(analysis: dict) -> RenderedSectionBody | None:
     boundaries = analysis.get("graph", {}).get("monorepo_boundaries", {})
 
     if not boundaries.get("detected"):
@@ -259,58 +286,73 @@ def _render_cross_service_boundaries(analysis: dict) -> str | None:
     imports = boundaries.get("cross_service_imports", [])
 
     if imports:
-        return (
+        core = (
             "- Cross-service imports were detected in the dependency graph.\n"
             "- Review shared contracts before changing any service boundary.\n"
         )
 
-    return (
-        "- No cross-service imports were detected in the current graph analysis.\n"
-        "- Preserve service boundaries unless a shared contract layer is introduced.\n"
-    )
+        expanded = (
+            "- Cross-service imports compromise service isolation; "
+            "introduce a shared contract layer before adding new cross-service dependencies.\n"
+        )
+    else:
+        core = (
+            "- No cross-service imports were detected in the current graph analysis.\n"
+            "- Preserve service boundaries unless a shared contract layer is introduced.\n"
+        )
+
+        expanded = ""
+
+    return RenderedSectionBody(core=core, expanded=expanded)
 
 
-def _render_commands_and_workflows(analysis: dict) -> str:
+def _render_commands_and_workflows(analysis: dict) -> RenderedSectionBody:
     commands = _python_commands(
         analysis.get("config", {}),
         analysis.get("tests", {}),
     )
 
-    return (
+    core = (
         "```bash\n"
         + "\n".join(commands)
         + "\n```\n\n"
         + "- Use the editable install plus the full `ruff`/`mypy`/`pytest` stack as the canonical local verification path.\n"
-        + "- Treat the installed CLI as the primary runtime surface; keep direct wrapper scripts as thin operator entrypoints when they exist.\n"
     )
 
+    expanded = "- Treat the installed CLI as the primary runtime surface; keep direct wrapper scripts as thin operator entrypoints when they exist.\n"
 
-def _render_code_formatting(repo: Path, analysis: dict) -> str:
+    return RenderedSectionBody(core=core, expanded=expanded)
+
+
+def _render_code_formatting(repo: Path, analysis: dict) -> RenderedSectionBody:
     python_metrics = analysis.get("measure", {}).get("python", {})
 
     if not python_metrics:
-        return "No formatting metrics were extracted from the current analysis run.\n"
+        return RenderedSectionBody(
+            core="No formatting metrics were extracted from the current analysis run.\n"
+        )
 
     indentation = python_metrics.get("indentation", {})
     line_length = python_metrics.get("line_length", {})
 
-    parts = [
+    core = (
         "### Python\n\n"
         f"- Indent with `{indentation.get('size', 0)}` {indentation.get('unit', 'unknown')}; Python files in the scan do not rely on tab-indented blocks.\n"
         f"- Keep ordinary lines around the measured p95 of `{line_length.get('p95', 0)}` and preserve the repo's one-blank-line import-to-constant / two-blank-lines top-level rhythm.\n"
         f"- Leave trailing whitespace stripped and keep a final trailing newline in generated files.\n"
         f"- Follow hanging-indented multiline calls and literals rather than backslash continuations.\n"
-    ]
+    )
 
+    expanded = ""
     multiline = _multiline_call_snippet(repo, analysis)
 
     if multiline:
-        parts.append("\n" + _code_block(multiline) + "\n")
+        expanded = "\n" + _code_block(multiline) + "\n"
 
-    return "".join(parts)
+    return RenderedSectionBody(core=core, expanded=expanded)
 
 
-def _render_naming_conventions(repo: Path, analysis: dict) -> str:
+def _render_naming_conventions(repo: Path, analysis: dict) -> RenderedSectionBody:
     symbols = analysis.get("symbols", {}).get("python", {})
     function_patterns = ", ".join(
         sorted(symbols.get("functions", {}).get("patterns", {}))
@@ -334,19 +376,26 @@ def _render_naming_conventions(repo: Path, analysis: dict) -> str:
         "",
     )
 
-    constant_snippet = _constant_snippet(repo, analysis)
-    body = (
+    core = (
         "### Python\n\n"
-        f"- Keep public helpers and command functions in snake_case; representative names include `{function_name or 'analyze'}` and the observed pattern set `{function_patterns or 'unknown'}`.\n"
-        f"- Use PascalCase for classes when they appear; representative class names follow patterns like `{class_name or 'ReferenceDocument'}` and `{class_patterns or 'PascalCase'}`.\n"
-        f"- Keep module constants in SCREAMING_SNAKE_CASE; representative names include `{constant_name or 'GIT_TIMEOUT'}` and the observed constant pattern set `{constant_patterns or 'unknown'}`.\n"
+        f"- Keep public helpers and command functions in snake_case; representative names include `{function_name or 'analyze'}`.\n"
+        f"- Use PascalCase for classes when they appear; representative names follow patterns like `{class_name or 'ReferenceDocument'}`.\n"
+        f"- Keep module constants in SCREAMING_SNAKE_CASE; representative names include `{constant_name or 'GIT_TIMEOUT'}`.\n"
         f"- Name test modules as `test_<subject>.py`; representative paths look like `{test_file or 'tests/test_cli.py'}`.\n"
     )
 
-    if constant_snippet:
-        body += "\n" + _code_block(constant_snippet) + "\n"
+    expanded = ""
+    constant_snippet = _constant_snippet(repo, analysis)
 
-    return body
+    if constant_snippet:
+        expanded_bullets = (
+            f"- Observed naming patterns: functions `{function_patterns or 'unknown'}`, "
+            f"classes `{class_patterns or 'PascalCase'}`, constants `{constant_patterns or 'unknown'}`.\n"
+        )
+
+        expanded = expanded_bullets + "\n" + _code_block(constant_snippet) + "\n"
+
+    return RenderedSectionBody(core=core, expanded=expanded)
 
 
 def _python_source_paths(scan: dict) -> list[str]:
@@ -514,7 +563,7 @@ def _representative_test_snippet(repo: Path, analysis: dict) -> str | None:
     return _trim_snippet(lines[start:end])
 
 
-def _render_type_annotations(repo: Path, analysis: dict) -> str:
+def _render_type_annotations(repo: Path, analysis: dict) -> RenderedSectionBody:
     scan = analysis.get("scan", {})
     paths = _python_source_paths(scan)
     annotated = 0
@@ -537,19 +586,23 @@ def _render_type_annotations(repo: Path, analysis: dict) -> str:
     config = analysis.get("config", {}).get("python", {})
     type_checker = config.get("type_checker", {}).get("name")
 
-    body = (
+    core = (
         "### Python\n\n"
-        f"- Annotate most public and internal helpers directly in the function signature; the current scan found `{annotated}` annotated definitions out of `{total_defs}` observed `def` lines.\n"
         "- Prefer built-in generics like `list[str]` and union syntax like `str | None` instead of legacy `typing.List` or `Optional` spellings.\n"
         f"- Treat `{type_checker or 'the configured type checker'}` as part of the normal contract when it is present in repo config.\n"
+    )
+
+    expanded = (
+        f"- Annotate most public and internal helpers directly in the function signature; "
+        f"the current scan found `{annotated}` annotated definitions out of `{total_defs}` observed `def` lines.\n"
     )
 
     typed_signature = _typed_signature_snippet(repo, analysis)
 
     if typed_signature:
-        body += "\n" + _code_block(typed_signature) + "\n"
+        expanded += "\n" + _code_block(typed_signature) + "\n"
 
-    return body
+    return RenderedSectionBody(core=core, expanded=expanded)
 
 
 def _first_import_block(repo: Path, analysis: dict) -> str:
@@ -579,20 +632,24 @@ def _first_import_block(repo: Path, analysis: dict) -> str:
     return ""
 
 
-def _render_imports(repo: Path, analysis: dict) -> str:
+def _render_imports(repo: Path, analysis: dict) -> RenderedSectionBody:
     block = _first_import_block(repo, analysis)
 
     if not block:
-        return "No representative import block was found in the scanned files.\n"
+        return RenderedSectionBody(
+            core="No representative import block was found in the scanned files.\n"
+        )
 
-    return (
+    core = (
         "### Python\n\n"
         "- Keep imports one-per-line and separate major groups with a blank line.\n"
         "- In runtime modules, stdlib imports come first and local package imports follow.\n"
-        "- In tests, local test helpers may appear before packaged runtime imports when that matches the file's setup style.\n\n"
-        + _code_block(block)
-        + "\n"
+        "- In tests, local test helpers may appear before packaged runtime imports when that matches the file's setup style.\n"
     )
+
+    expanded = "\n" + _code_block(block) + "\n"
+
+    return RenderedSectionBody(core=core, expanded=expanded)
 
 
 def _indentation(line: str) -> int:
@@ -744,52 +801,68 @@ def _fallback_helper_snippet(repo: Path, analysis: dict) -> str | None:
     return _first_python_snippet(repo, analysis, matcher)
 
 
-def _render_error_handling(repo: Path, analysis: dict) -> str:
-    snippets: list[str] = []
-    bullets: list[str] = []
+def _render_error_handling(repo: Path, analysis: dict) -> RenderedSectionBody:
     value_error = _value_error_snippet(repo, analysis)
     error_payload = _error_payload_snippet(repo, analysis)
     logged_exception = _logged_exception_snippet(repo, analysis)
     fallback_helper = _fallback_helper_snippet(repo, analysis)
 
+    core_bullets: list[str] = []
+    expanded_bullets: list[str] = []
+    snippets: list[str] = []
+
     if value_error:
-        bullets.append(
+        core_bullets.append(
             "- Low-level validators raise `ValueError` with specific message text for invalid caller input."
         )
+
         snippets.append("```python\n" + value_error + "\n```")
 
     if error_payload:
-        bullets.append(
+        core_bullets.append(
             '- Analyzer boundaries convert validation failures into exact `{"error": ..., "script": ...}` payloads.'
         )
+
         snippets.append("```python\n" + error_payload + "\n```")
 
     if logged_exception:
-        bullets.append(
-            "- Shared CLI wrappers catch broad exceptions, log or print diagnostics, and return non-zero status instead of letting failures escape unshaped."
+        core_bullets.append(
+            "- Shared CLI wrappers catch broad exceptions and return non-zero status instead of letting failures escape unshaped."
         )
+
         snippets.append("```python\n" + logged_exception + "\n```")
 
     if fallback_helper:
-        bullets.append(
+        core_bullets.append(
             '- Best-effort file helpers swallow unreadable-file exceptions and fall back to `""` or `0` so scans can continue.'
         )
+
         snippets.append("```python\n" + fallback_helper + "\n```")
 
-    if not bullets:
-        return (
-            "### Python\n\n"
-            "- No stable error-handling pattern could be extracted from the scanned Python files.\n"
+    if not core_bullets:
+        return RenderedSectionBody(
+            core="### Python\n\n- No stable error-handling pattern could be extracted from the scanned Python files.\n"
         )
 
-    bullets.append(
+    core_bullets.append(
         "- Match the existing boundary between raised validation errors and user-facing error payloads instead of introducing a new exception contract."
     )
 
-    return "### Python\n\n" + "\n".join(bullets) + "\n\n" + "\n\n".join(snippets) + "\n"
+    expanded_bullets.append(
+        "- Shared CLI wrappers log or print diagnostics before converting failures into non-zero status."
+    )
+
+    core = "### Python\n\n" + "\n".join(core_bullets) + "\n"
+    expanded = ""
+
+    if snippets or expanded_bullets:
+        expanded_text = "\n".join(expanded_bullets) + "\n\n" + "\n\n".join(snippets)
+        expanded = "\n" + expanded_text + "\n"
+
+    return RenderedSectionBody(core=core, expanded=expanded)
 
 
-def _render_comments_and_docstrings(repo: Path, analysis: dict) -> str:
+def _render_comments_and_docstrings(repo: Path, analysis: dict) -> RenderedSectionBody:
     scan = analysis.get("scan", {})
     docstrings = 0
     comments = 0
@@ -802,74 +875,89 @@ def _render_comments_and_docstrings(repo: Path, analysis: dict) -> str:
             if line.strip().startswith("#"):
                 comments += 1
 
-    body = (
+    core = (
         "### Python\n\n"
-        f"- Module docstrings are common in runtime files; the scan saw `{docstrings}` triple-quoted docstring markers across representative Python files.\n"
-        f"- Keep inline comments sparse and use them to clarify a non-obvious detail rather than narrating obvious code; the scan saw `{comments}` comment lines in the representative pass.\n"
         "- Prefer short, declarative docstrings and brief targeted inline comments when the code would otherwise be ambiguous.\n"
+        "- Keep inline comments sparse; use them to clarify a non-obvious detail rather than narrating obvious code.\n"
+    )
+
+    expanded = (
+        f"- Module docstrings are common in runtime files; the scan saw `{docstrings}` triple-quoted docstring markers across representative Python files.\n"
+        f"- The scan saw `{comments}` comment lines in the representative pass.\n"
     )
 
     module_docstring = _module_docstring_snippet(repo, analysis)
     inline_comment = _inline_comment_snippet(repo, analysis)
 
     if module_docstring:
-        body += "\n" + _code_block(module_docstring) + "\n"
+        expanded += "\n" + _code_block(module_docstring) + "\n"
 
     if inline_comment:
-        body += "\n" + _code_block(inline_comment) + "\n"
+        expanded += "\n" + _code_block(inline_comment) + "\n"
 
-    return body
+    return RenderedSectionBody(core=core, expanded=expanded)
 
 
-def _render_testing(repo: Path, analysis: dict) -> str:
+def _render_testing(repo: Path, analysis: dict) -> RenderedSectionBody:
     python_tests = analysis.get("tests", {}).get("python", {})
     coverage = python_tests.get("coverage_shape", {})
     fixtures = python_tests.get("fixtures", {})
     test_snippet = _representative_test_snippet(repo, analysis)
 
-    body = (
+    core = (
         "### Python\n\n"
         f"- Use `{python_tests.get('framework', 'unknown')}` as the primary Python test framework and `{python_tests.get('run_command', 'unknown')}` as the full-suite command.\n"
         f"- Keep Python tests under the detected pattern `{python_tests.get('naming', {}).get('file_pattern', 'unknown')}` and follow function names like `{python_tests.get('naming', {}).get('function_pattern', 'test_<description>')}`.\n"
+    )
+
+    expanded = (
         f"- Reuse shared test bootstrap from `{', '.join(fixtures.get('conftest_locations', [])) or 'tests/conftest.py'}` when present.\n"
         f"- The current source-to-test mapping leaves `{len(coverage.get('untested_source_files', []))}` Python source files without a matched test file, so new source files should usually arrive with an adjacent or mirrored test.\n"
     )
 
     if test_snippet:
-        body += "\n" + _code_block(test_snippet) + "\n"
+        expanded += "\n" + _code_block(test_snippet) + "\n"
 
-    return body
+    return RenderedSectionBody(core=core, expanded=expanded)
 
 
-def _render_git(analysis: dict) -> str:
+def _render_git(analysis: dict) -> RenderedSectionBody:
     git = analysis.get("git", {})
 
     if "error" in git:
-        return f"- Git analysis unavailable: `{git['error']}`.\n"
+        return RenderedSectionBody(
+            core=f"- Git analysis unavailable: `{git['error']}`.\n"
+        )
 
     commits = git.get("commits", {})
     prefixes = commits.get("prefixes", {})
     prefix_names = ", ".join(sorted(prefixes)) or "unknown"
     merge_strategy = git.get("merge_strategy", {}).get("detected", "unknown")
 
+    core = (
+        f"- Commit subjects follow conventional prefixes such as `{prefix_names}`.\n"
+        f"- The observed merge strategy is `{merge_strategy}`.\n"
+    )
+
     examples = [
         f"`{name}:` for commits like `{info.get('example', '')}`"
         for name, info in list(prefixes.items())[:5]
     ]
 
+    expanded = ""
+
+    if examples:
+        expanded = f"- Representative commit examples include {', '.join(examples)}.\n"
+
     branch_example = git.get("branches", {}).get("naming_example")
-    return (
-        f"- Commit subjects follow conventional prefixes such as `{prefix_names}`; representative examples include {', '.join(examples)}.\n"
-        f"- The observed merge strategy is `{merge_strategy}`.\n"
-        + (
-            f"- Branch names use slash-separated prefixes with examples like `{branch_example}`.\n"
-            if branch_example
-            else ""
-        )
-    )
+
+    if branch_example:
+        core += f"- Branch names use slash-separated prefixes with examples like `{branch_example}`.\n"
+
+    return RenderedSectionBody(core=core, expanded=expanded)
 
 
-def _render_dependencies_and_tooling(repo: Path, analysis: dict) -> str:
+def _render_dependencies_and_tooling(repo: Path, analysis: dict) -> RenderedSectionBody:
     config = analysis.get("config", {})
     tools: list[str] = []
 
@@ -892,19 +980,21 @@ def _render_dependencies_and_tooling(repo: Path, analysis: dict) -> str:
     scripts = project.get("scripts", {})
     script_names = ", ".join(sorted(scripts)) if isinstance(scripts, dict) else ""
 
-    return (
+    core = (
         "### Python\n\n"
         f"- Package metadata lives in `pyproject.toml`; the current project name is `{package_name}` and the declared Python floor is `{requires_python}`.\n"
-        + (
-            f"- Published console scripts include `{script_names}`.\n"
-            if script_names
-            else ""
-        )
-        + f"- Tooling detected from repo config includes `{tool_list}`.\n"
+        f"- Tooling detected from repo config includes `{tool_list}`.\n"
     )
 
+    expanded = ""
 
-def _render_red_lines(repo: Path, analysis: dict) -> str:
+    if script_names:
+        expanded = f"- Published console scripts include `{script_names}`.\n"
+
+    return RenderedSectionBody(core=core, expanded=expanded)
+
+
+def _render_red_lines(repo: Path, analysis: dict) -> RenderedSectionBody:
     scan = analysis.get("scan", {})
     roots = ", ".join(
         sorted({path.split("/", 1)[0] for path in scan.get("read_order", [])})
@@ -926,20 +1016,25 @@ def _render_red_lines(repo: Path, analysis: dict) -> str:
         "src",
     )
 
-    return (
+    core = (
         f"- Do not invent new top-level layout patterns when the scan already shows established roots such as `{roots or 'the detected source tree'}`.\n"
         f"- Do not move reusable runtime logic out of `{package_name}` into thin wrapper locations like `scripts/`.\n"
         "- Do not colocate new tests beside source modules when the repo already maintains a separate `tests/` tree.\n"
         "- Do not replace built-in generics and `| None` unions with older `typing.List` / `Optional` spellings in annotated Python code.\n"
         "- Do not switch import grouping to a flat unsplit block when runtime modules already separate stdlib and local imports.\n"
-        "- Do not introduce broad formatting drift such as tabs in Python, missing trailing newlines, or backslash-heavy continuation style.\n"
-        "- Do not convert structured error payload boundaries into uncaught CLI exceptions when the repo already normalizes them at command boundaries.\n"
         "- Do not replace the documented verification stack with ad hoc commands; keep local checks aligned with `"
         + ", ".join(commands)
         + "`.\n"
+    )
+
+    expanded = (
+        "- Do not introduce broad formatting drift such as tabs in Python, missing trailing newlines, or backslash-heavy continuation style.\n"
+        "- Do not convert structured error payload boundaries into uncaught CLI exceptions when the repo already normalizes them at command boundaries.\n"
         "- Do not treat example or fixture repositories as runtime code when `examples/` is present as a separate root.\n"
         "- Do not assume missing analyzer signals imply permission to rewrite local conventions.\n"
     )
+
+    return RenderedSectionBody(core=core, expanded=expanded)
 
 
 def _apply_section_feedback(body: str, feedback: SectionFeedback | None) -> str:
@@ -964,8 +1059,9 @@ def render_agents_sections(
     repo: Path,
     analysis: dict,
     feedback: UpdateFeedback | None = None,
+    profile: str = "concise",
 ) -> dict[str, AgentsSection]:
-    rendered: dict[str, str | None] = {
+    rendered: dict[str, RenderedSectionBody | None] = {
         "overview": _render_overview(repo, analysis),
         "repository structure": _render_repository_structure(analysis),
         "service map": _render_service_map(analysis),
@@ -991,10 +1087,11 @@ def render_agents_sections(
         if body is None:
             continue
 
+        rendered_text = combine_section_body(profile, body)
         section_feedback = None if feedback is None else feedback.sections.get(name)
         sections[name] = build_section(
             SECTION_HEADINGS[name],
-            _apply_section_feedback(body, section_feedback),
+            _apply_section_feedback(rendered_text, section_feedback),
             heading_level=2,
         )
 
@@ -1045,7 +1142,11 @@ def update_agents(
         repo_path = validate_repo(repo)
         analysis = run_all(str(repo_path))
         feedback = load_feedback(repo_path)
-        sections = render_agents_sections(repo_path, analysis, feedback)
+
+        sections = render_agents_sections(
+            repo_path, analysis, feedback, profile=profile
+        )
+
         preserve_sections = [] if force else feedback.preserve_sections
         effective_excludes = [*(exclude_sections or []), *preserve_sections]
         _validate_requested_sections(include_sections, effective_excludes, sections)

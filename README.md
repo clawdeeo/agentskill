@@ -106,6 +106,7 @@ static source inspection.
 
 - `agentskill analyze <repo> --pretty` for combined machine-readable analysis
 - `agentskill generate <repo>` for a fresh `AGENTS.md` draft
+- `agentskill generate <repo> --profile comprehensive` for a richer draft with representative snippets and expanded detail
 - `agentskill update <repo>` for deterministic regeneration of an existing
   `AGENTS.md`
 
@@ -321,6 +322,28 @@ merges them with any existing `AGENTS.md`, and writes the result back to
 - Untouched custom sections and preamble text stay in place in normal mode.
 - Use `--force` for a clean-slate rebuild that drops preserved/manual sections
   and ignores preservation hints from feedback.
+
+### Output Profiles
+
+Both `generate` and `update` accept `--profile` to control rendering density.
+The profile affects how much detail appears in each section without changing
+section order, section headings, or the underlying analyzer facts.
+
+- `--profile concise` (default) — operational rules and key facts only; omits
+  representative code snippets and secondary explanatory bullets.
+- `--profile comprehensive` — includes everything from concise plus
+  representative snippets, annotation counts, expanded explanatory bullets,
+  and richer provenance from analyzer results.
+- `--profile split` — accepted by the CLI contract but not yet implemented;
+  produces a clear "not implemented yet" error at the rendering stage.
+
+Both profiles produce deterministic output from the same analyzer results.
+
+```bash
+agentskill generate <repo> --profile concise
+agentskill generate <repo> --profile comprehensive
+agentskill update <repo> --profile comprehensive
+```
 
 ### Repo-Local Feedback
 

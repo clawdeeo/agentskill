@@ -59,7 +59,7 @@ def render_agents_markdown(
     documents = load_reference_documents(references)
     analysis = run_all(str(repo))
     feedback = load_feedback(repo)
-    sections = render_agents_sections(repo, analysis, feedback)
+    sections = render_agents_sections(repo, analysis, feedback, profile=profile)
 
     if interactive:
         gaps = detect_generation_gaps(analysis, documents)

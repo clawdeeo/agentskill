@@ -162,7 +162,16 @@ def test_update_enriches_error_handling_with_static_source_snippets(tmp_path):
         ),
     )
 
-    exit_code = main(["update", str(repo), "--section", "error handling"])
+    exit_code = main(
+        [
+            "update",
+            str(repo),
+            "--section",
+            "error handling",
+            "--profile",
+            "comprehensive",
+        ]
+    )
 
     assert exit_code == 0
 
